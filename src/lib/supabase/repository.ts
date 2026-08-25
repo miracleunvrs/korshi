@@ -247,7 +247,13 @@ export async function submitVerificationRequest(data: {
   const { supabase, userId } = await profileContext();
   const { error } = await supabase.from("verification_requests").insert({
     user_id: userId,
-    ...data,
+    full_name: data.fullName,
+    phone: data.phone || null,
+    building_number: data.buildingNumber,
+    entrance_number: data.entranceNumber,
+    apartment_number: data.apartmentNumber,
+    document_type: data.documentType,
+    document_path: data.documentPath,
   });
   if (error) throw error;
 }
