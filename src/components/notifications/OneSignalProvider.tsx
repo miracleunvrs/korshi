@@ -22,9 +22,11 @@ const appId = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID;
 export default function OneSignalProvider() {
   const userId = useAppStore((state) => state.supabaseUserId);
   const instanceRef = useRef<OneSignalInstance | null>(null);
+  const initializationFailedRef = useRef(false);
 
   useEffect(() => {
     if (!appId || typeof window === "undefined") return;
+    if (initializationFailedRef.current) return;
 
     if (instanceRef.current) {
       if (userId) void instanceRef.current.login?.(userId);
@@ -43,15 +45,20 @@ export default function OneSignalProvider() {
     }
 
     queue.push(async (oneSignal) => {
-      instanceRef.current = oneSignal;
-      if (oneSignal.init) {
-        await oneSignal.init({
-          appId,
-          serviceWorkerPath: "/OneSignalSDKWorker.js",
-          allowLocalhostAsSecureOrigin: true,
-        });
+      try {
+        if (oneSignal.init) {
+          await oneSignal.init({
+            appId,
+            serviceWorkerPath: "/OneSignalSDKWorker.js",
+            allowLocalhostAsSecureOrigin: true,
+          });
+        }
+        instanceRef.current = oneSignal;
+        if (userId && oneSignal.login) await oneSignal.login(userId);
+      } catch {
+        initializationFailedRef.current = true;
+        // App ID without enabled Web Push is a dashboard configuration issue.
       }
-      if (userId && oneSignal.login) await oneSignal.login(userId);
     });
   }, [userId]);
 

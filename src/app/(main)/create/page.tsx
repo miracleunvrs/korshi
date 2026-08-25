@@ -14,7 +14,7 @@ import {
   Image as ImageIcon,
   ArrowLeft
 } from "lucide-react";
-import type { PostType, TerritoryType } from "@/types/database.types";
+import type { PostType, TerritoryType } from "@/types/domain";
 import type { PostWithAuthor } from "@/types";
 import { useAppStore } from "@/stores/appStore";
 

@@ -1,4 +1,5 @@
-import type { Database, UserRole, PostType, InitiativeStage, TerritoryType } from "./database.types";
+import type { Database } from "./database.types";
+import type { UserRole, PostType, InitiativeStage, TerritoryType } from "./domain";
 
 export type { UserRole, PostType, InitiativeStage, TerritoryType };
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
