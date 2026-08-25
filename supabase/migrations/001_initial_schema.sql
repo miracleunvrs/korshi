@@ -42,7 +42,7 @@ $$ LANGUAGE plpgsql;
 
 -- Жилые комплексы
 CREATE TABLE complexes (
-  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name        TEXT NOT NULL,
   address     TEXT,
   city        TEXT NOT NULL DEFAULT 'Алматы',
@@ -52,7 +52,7 @@ CREATE TABLE complexes (
 
 -- Дома в ЖК
 CREATE TABLE buildings (
-  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   complex_id  UUID NOT NULL REFERENCES complexes(id) ON DELETE CASCADE,
   number      TEXT NOT NULL,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -61,7 +61,7 @@ CREATE TABLE buildings (
 
 -- Подъезды
 CREATE TABLE entrances (
-  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   building_id UUID NOT NULL REFERENCES buildings(id) ON DELETE CASCADE,
   number      INT NOT NULL,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -70,7 +70,7 @@ CREATE TABLE entrances (
 
 -- Квартиры
 CREATE TABLE apartments (
-  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   entrance_id UUID NOT NULL REFERENCES entrances(id) ON DELETE CASCADE,
   number      TEXT NOT NULL,
   floor       INT,
@@ -110,7 +110,7 @@ CREATE INDEX idx_profiles_apartment_id ON profiles(apartment_id);
 -- =====================================================
 
 CREATE TABLE posts (
-  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   author_id     UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   complex_id    UUID NOT NULL REFERENCES complexes(id) ON DELETE CASCADE,
   building_id   UUID REFERENCES buildings(id),
@@ -141,7 +141,7 @@ CREATE INDEX idx_posts_entrance_id ON posts(entrance_id) WHERE entrance_id IS NO
 
 -- Медиафайлы к публикациям
 CREATE TABLE post_attachments (
-  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   post_id     UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
   url         TEXT NOT NULL,
   type        attachment_type NOT NULL DEFAULT 'image',
@@ -154,7 +154,7 @@ CREATE INDEX idx_post_attachments_post_id ON post_attachments(post_id);
 
 -- Комментарии
 CREATE TABLE comments (
-  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   post_id     UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
   author_id   UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   parent_id   UUID REFERENCES comments(id) ON DELETE CASCADE,
@@ -172,7 +172,7 @@ CREATE INDEX idx_comments_author_id ON comments(author_id);
 
 -- Реакции
 CREATE TABLE reactions (
-  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   post_id     UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
   user_id     UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   type        reaction_type NOT NULL DEFAULT 'like',
@@ -187,7 +187,7 @@ CREATE INDEX idx_reactions_post_id ON reactions(post_id);
 -- =====================================================
 
 CREATE TABLE polls (
-  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   post_id       UUID NOT NULL UNIQUE REFERENCES posts(id) ON DELETE CASCADE,
   is_multiple   BOOLEAN NOT NULL DEFAULT FALSE,
   ends_at       TIMESTAMPTZ,
@@ -195,7 +195,7 @@ CREATE TABLE polls (
 );
 
 CREATE TABLE poll_options (
-  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   poll_id     UUID NOT NULL REFERENCES polls(id) ON DELETE CASCADE,
   text        TEXT NOT NULL,
   votes_count INT NOT NULL DEFAULT 0,
@@ -205,7 +205,7 @@ CREATE TABLE poll_options (
 CREATE INDEX idx_poll_options_poll_id ON poll_options(poll_id);
 
 CREATE TABLE poll_votes (
-  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   poll_id     UUID NOT NULL REFERENCES polls(id) ON DELETE CASCADE,
   option_id   UUID NOT NULL REFERENCES poll_options(id) ON DELETE CASCADE,
   user_id     UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
@@ -272,7 +272,7 @@ CREATE INDEX idx_poll_votes_poll_id ON poll_votes(poll_id);
 -- =====================================================
 
 CREATE TABLE initiatives (
-  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   post_id     UUID NOT NULL UNIQUE REFERENCES posts(id) ON DELETE CASCADE,
   stage       initiative_stage NOT NULL DEFAULT 'proposal',
   goal        TEXT,
@@ -285,7 +285,7 @@ CREATE TRIGGER set_initiatives_updated_at
   FOR EACH ROW EXECUTE FUNCTION trigger_set_updated_at();
 
 CREATE TABLE initiative_supports (
-  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   initiative_id   UUID NOT NULL REFERENCES initiatives(id) ON DELETE CASCADE,
   user_id         UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -313,7 +313,7 @@ CREATE TRIGGER increment_initiative_supporters_after_insert
 -- =====================================================
 
 CREATE TABLE fundraisers (
-  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   post_id         UUID NOT NULL UNIQUE REFERENCES posts(id) ON DELETE CASCADE,
   initiative_id   UUID REFERENCES initiatives(id),
   target_amount   NUMERIC(14, 2) NOT NULL,
@@ -332,7 +332,7 @@ CREATE TRIGGER set_fundraisers_updated_at
   FOR EACH ROW EXECUTE FUNCTION trigger_set_updated_at();
 
 CREATE TABLE fundraiser_payments (
-  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   fundraiser_id   UUID NOT NULL REFERENCES fundraisers(id) ON DELETE CASCADE,
   user_id         UUID REFERENCES profiles(id),
   amount          NUMERIC(12, 2) NOT NULL,
@@ -349,7 +349,7 @@ CREATE INDEX idx_fundraiser_payments_fundraiser_id ON fundraiser_payments(fundra
 -- =====================================================
 
 CREATE TABLE chats (
-  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   complex_id    UUID NOT NULL REFERENCES complexes(id) ON DELETE CASCADE,
   building_id   UUID REFERENCES buildings(id),
   entrance_id   UUID REFERENCES entrances(id),
@@ -366,7 +366,7 @@ CREATE TABLE chats (
 CREATE INDEX idx_chats_complex_id ON chats(complex_id);
 
 CREATE TABLE chat_members (
-  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   chat_id       UUID NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
   user_id       UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   role          chat_member_role NOT NULL DEFAULT 'member',
@@ -379,7 +379,7 @@ CREATE INDEX idx_chat_members_user_id ON chat_members(user_id);
 CREATE INDEX idx_chat_members_chat_id ON chat_members(chat_id);
 
 CREATE TABLE messages (
-  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   chat_id       UUID NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
   sender_id     UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   reply_to_id   UUID REFERENCES messages(id),
@@ -402,7 +402,7 @@ CREATE INDEX idx_messages_created_at ON messages(created_at DESC);
 -- =====================================================
 
 CREATE TABLE service_providers (
-  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   profile_id      UUID NOT NULL UNIQUE REFERENCES profiles(id) ON DELETE CASCADE,
   description     TEXT,
   categories      TEXT[] NOT NULL DEFAULT '{}',
@@ -420,7 +420,7 @@ CREATE TABLE service_providers (
 -- =====================================================
 
 CREATE TABLE notifications (
-  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   type        TEXT NOT NULL,
   title       TEXT NOT NULL,
@@ -438,7 +438,7 @@ CREATE INDEX idx_notifications_is_read ON notifications(user_id, is_read) WHERE 
 -- =====================================================
 
 CREATE TABLE moderation_logs (
-  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   moderator_id    UUID NOT NULL REFERENCES profiles(id),
   target_type     moderation_target NOT NULL,
   target_id       UUID NOT NULL,

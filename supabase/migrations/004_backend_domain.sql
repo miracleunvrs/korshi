@@ -3,7 +3,7 @@
 CREATE TYPE verification_request_status AS ENUM ('pending', 'approved', 'rejected');
 
 CREATE TABLE verification_requests (
-  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id           UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   full_name         TEXT NOT NULL,
   phone             TEXT,
@@ -23,7 +23,7 @@ CREATE INDEX idx_verification_requests_user ON verification_requests(user_id);
 CREATE INDEX idx_verification_requests_status ON verification_requests(status);
 
 CREATE TABLE classifieds (
-  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   author_id       UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   complex_id      UUID NOT NULL REFERENCES complexes(id) ON DELETE CASCADE,
   title           TEXT NOT NULL,
