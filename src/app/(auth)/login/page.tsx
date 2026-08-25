@@ -8,7 +8,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { loginUser, registerUser, switchAccount, registeredUsers } = useAppStore();
+  const { loginUser, registerUser, resetPassword, switchAccount, registeredUsers } = useAppStore();
   const demoMode = !isSupabaseConfigured();
 
   const [activeTab, setActiveTab] = useState<"login" | "register" | "demo">(
@@ -20,6 +20,7 @@ export default function LoginPage() {
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   // Register form
   const [regName, setRegName] = useState("");
@@ -88,6 +89,23 @@ export default function LoginPage() {
       setRegError(err?.message || "Ошибка регистрации");
     } finally {
       setRegLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    setLoginError("");
+    if (!loginEmail.trim()) {
+      setLoginError("Сначала введите email");
+      return;
+    }
+    setLoginLoading(true);
+    try {
+      await resetPassword(loginEmail);
+      setResetSent(true);
+    } catch (err: any) {
+      setLoginError(err?.message || "Не удалось отправить письмо");
+    } finally {
+      setLoginLoading(false);
     }
   };
 
@@ -233,7 +251,11 @@ export default function LoginPage() {
                     minLength={6}
                     required
                   />
+                  <button type="button" onClick={handleResetPassword} className="mt-2 text-[11px] font-bold text-green-700 hover:text-green-800">
+                    Забыли пароль?
+                  </button>
                 </div>
+                {resetSent && <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-xs text-green-800">Письмо для смены пароля отправлено на email.</div>}
 
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">

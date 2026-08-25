@@ -310,6 +310,7 @@ export interface AppState {
   }) => Promise<RegistrationResult>;
 
   loginUser: (email: string, password: string) => Promise<UserAccount>;
+  resetPassword: (email: string) => Promise<void>;
   logoutUser: () => Promise<void>;
   syncAuthState: () => Promise<void>;
   switchAccount: (userId: string) => void;
@@ -557,6 +558,14 @@ export const useAppStore = create<AppState>()(
         const user = found;
         set({ currentUser: user, isLoggedIn: true });
         return user;
+      },
+
+      resetPassword: async (email) => {
+        if (!isSupabaseConfigured()) throw new Error("Восстановление доступно только для реального аккаунта");
+        const { error } = await createClient().auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+          redirectTo: `${getAuthCallbackUrl()}?next=/reset-password`,
+        });
+        if (error) throw error;
       },
 
       logoutUser: async () => {
