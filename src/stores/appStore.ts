@@ -177,11 +177,6 @@ export interface RegistrationResult {
   requiresEmailConfirmation: boolean;
 }
 
-function normalizePhone(phone: string) {
-  const digits = phone.replace(/\D/g, "");
-  return digits ? `+${digits}` : "";
-}
-
 function roleLabel(role: UserRole, buildingNumber: string) {
   if (role === "service_provider") return "Мастер услуг ЖК";
   if (role === "hoa_official") return "Представитель ОСИ";
@@ -315,8 +310,6 @@ export interface AppState {
   }) => Promise<RegistrationResult>;
 
   loginUser: (email: string, password: string) => Promise<UserAccount>;
-  sendOtp: (phone: string) => Promise<void>;
-  verifyOtp: (phone: string, token: string) => Promise<UserAccount>;
   logoutUser: () => Promise<void>;
   syncAuthState: () => Promise<void>;
   switchAccount: (userId: string) => void;
@@ -564,46 +557,6 @@ export const useAppStore = create<AppState>()(
         const user = found;
         set({ currentUser: user, isLoggedIn: true });
         return user;
-      },
-
-      sendOtp: async (phone) => {
-        if (!isSupabaseConfigured()) return;
-
-        const { error } = await createClient().auth.signInWithOtp({
-          phone: normalizePhone(phone),
-          options: { shouldCreateUser: false },
-        });
-        if (error) throw error;
-      },
-
-      verifyOtp: async (phone, token) => {
-        if (!isSupabaseConfigured()) {
-          const digits = phone.replace(/\D/g, "");
-          const account = get().registeredUsers.find((user) =>
-            user.phone.replace(/\D/g, "").endsWith(digits.slice(-7))
-          );
-          if (token !== "123456" || !account) throw new Error("Неверный демо-код или номер");
-          set({ currentUser: account, isLoggedIn: true });
-          return account;
-        }
-
-        const supabase = createClient();
-        const { data, error } = await supabase.auth.verifyOtp({
-          phone: normalizePhone(phone),
-          token,
-          type: "sms",
-        });
-        if (error) throw error;
-        if (!data.user) throw new Error("Supabase не вернул пользователя");
-
-        const account = await loadAccount(data.user);
-        set((current) => ({
-          registeredUsers: mergeAccount(current.registeredUsers, account),
-          currentUser: account,
-          isLoggedIn: true,
-          supabaseUserId: data.user!.id,
-        }));
-        return account;
       },
 
       logoutUser: async () => {

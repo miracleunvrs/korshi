@@ -30,15 +30,8 @@ https://<production-domain>/auth/callback
 
 Также проверьте Site URL и шаблон Confirm signup. Callback приложения уже реализован в `/auth/callback`.
 
-## OneSignal SMS OTP
+## OneSignal
 
-В OneSignal включите SMS и создайте Verify service. В `.env.local` добавьте только серверные значения:
+Интеграция OneSignal для SMS и push временно отключена. Вход и регистрация работают только через email и пароль с подтверждением email. Телефон хранится как необязательный контактный профиль и не используется для авторизации.
 
-```dotenv
-ONESIGNAL_VERIFY_SERVICE_ID=<verification-service-id>
-ONESIGNAL_REST_API_KEY=<server-only-rest-api-key>
-```
-
-OneSignal Web Push для авторизации не используется. SMS-коды отправляются только через server route; ключ нельзя помещать в `NEXT_PUBLIC_*`, клиентский код или git.
-
-Источники: [OneSignal SMS OTP](https://documentation.onesignal.com/docs/en/sms-verify), [OneSignal OTP guidance](https://documentation.onesignal.com/docs/en/example-verification-magic-link-otp), [Supabase redirect URLs](https://supabase.com/docs/guides/auth/redirect-urls), [Supabase email confirmation](https://supabase.com/docs/guides/auth/general-configuration).
+Источники Supabase: [redirect URLs](https://supabase.com/docs/guides/auth/redirect-urls), [email confirmation](https://supabase.com/docs/guides/auth/general-configuration).

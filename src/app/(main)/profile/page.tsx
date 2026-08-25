@@ -240,10 +240,10 @@ export default function ProfilePage() {
               </div>
               <div className="flex items-center justify-between p-3.5 bg-gray-50 rounded-2xl">
                 <div>
-                  <p className="font-bold text-xs text-gray-900">SMS-подтверждения</p>
-                  <p className="text-[10px] text-gray-400">Коды входа и подтверждения номера телефона</p>
+                  <p className="font-bold text-xs text-gray-900">Контактный телефон</p>
+                  <p className="text-[10px] text-gray-400">Телефон используется только как контакт в профиле</p>
                 </div>
-                <span className="text-[10px] font-bold text-gray-400">Через OneSignal</span>
+                <span className="text-[10px] font-bold text-gray-400">Не для входа</span>
               </div>
               <button
                 type="button"
