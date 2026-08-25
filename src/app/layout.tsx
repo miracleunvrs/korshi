@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import AuthStateSync from "@/components/auth/AuthStateSync";
-import OneSignalProvider from "@/components/notifications/OneSignalProvider";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin", "cyrillic"] });
@@ -33,7 +32,6 @@ export default function RootLayout({
     <html lang="ru">
       <body className={inter.className}>
         <AuthStateSync />
-        <OneSignalProvider />
         <div className="min-h-screen bg-gray-50">{children}</div>
       </body>
     </html>

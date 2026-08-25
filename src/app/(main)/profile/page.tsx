@@ -19,7 +19,6 @@ import {
   LogOut
 } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
-import PushPermissionButton from "@/components/notifications/PushPermissionButton";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 export default function ProfilePage() {
@@ -237,14 +236,14 @@ export default function ProfilePage() {
                   <p className="font-bold text-xs text-gray-900">Уведомления ОСИ</p>
                   <p className="text-[10px] text-gray-400">Плановые работы, отключения воды и электричества</p>
                 </div>
-                <PushPermissionButton />
+                <span className="text-[10px] font-bold text-gray-400">В настройках ОСИ</span>
               </div>
               <div className="flex items-center justify-between p-3.5 bg-gray-50 rounded-2xl">
                 <div>
-                  <p className="font-bold text-xs text-gray-900">Сообщения чата дома</p>
-                  <p className="text-[10px] text-gray-400">Звуковые push-уведомления о новых сообщениях</p>
+                  <p className="font-bold text-xs text-gray-900">SMS-подтверждения</p>
+                  <p className="text-[10px] text-gray-400">Коды входа и подтверждения номера телефона</p>
                 </div>
-                <input type="checkbox" defaultChecked className="w-4 h-4 accent-green-600 rounded" />
+                <span className="text-[10px] font-bold text-gray-400">Через OneSignal</span>
               </div>
               <button
                 type="button"

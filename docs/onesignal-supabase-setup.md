@@ -30,22 +30,15 @@ https://<production-domain>/auth/callback
 
 Также проверьте Site URL и шаблон Confirm signup. Callback приложения уже реализован в `/auth/callback`.
 
-## OneSignal Web Push
+## OneSignal SMS OTP
 
-Создайте отдельное OneSignal Web App для localhost и production. В `.env.local` добавьте только публичный App ID:
-
-```dotenv
-NEXT_PUBLIC_ONESIGNAL_APP_ID=<onesignal-app-id>
-```
-
-Интеграция уже подключает Web SDK v16, связывает push-подписку с Supabase user id через `OneSignal.login()` и содержит `public/OneSignalSDKWorker.js`. В профиле кнопка «Включить push» запрашивает браузерное разрешение.
-
-В OneSignal Web Configuration укажите точный origin сайта. Для localhost включите режим Treat HTTP localhost as HTTPS. Для production используйте HTTPS. Service worker должен быть доступен по `/OneSignalSDKWorker.js` без редиректа.
-
-REST API Key OneSignal нужен только серверу для отправки targeted notifications. Его нельзя помещать в `NEXT_PUBLIC_*`, клиентский код или git. Для будущего server route используйте:
+В OneSignal включите SMS и создайте Verify service. В `.env.local` добавьте только серверные значения:
 
 ```dotenv
-ONESIGNAL_REST_API_KEY=<server-only-key>
+ONESIGNAL_VERIFY_SERVICE_ID=<verification-service-id>
+ONESIGNAL_REST_API_KEY=<server-only-rest-api-key>
 ```
 
-Источники: [OneSignal Web SDK setup](https://documentation.onesignal.com/docs/en/web-sdk-setup), [OneSignal Web SDK reference](https://documentation.onesignal.com/docs/en/web-sdk-reference), [Supabase redirect URLs](https://supabase.com/docs/guides/auth/redirect-urls), [Supabase email confirmation](https://supabase.com/docs/guides/auth/general-configuration).
+OneSignal Web Push для авторизации не используется. SMS-коды отправляются только через server route; ключ нельзя помещать в `NEXT_PUBLIC_*`, клиентский код или git.
+
+Источники: [OneSignal SMS OTP](https://documentation.onesignal.com/docs/en/sms-verify), [OneSignal OTP guidance](https://documentation.onesignal.com/docs/en/example-verification-magic-link-otp), [Supabase redirect URLs](https://supabase.com/docs/guides/auth/redirect-urls), [Supabase email confirmation](https://supabase.com/docs/guides/auth/general-configuration).
