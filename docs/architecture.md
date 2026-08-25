@@ -1,0 +1,194 @@
+# HouseSM — Архитектура проекта
+
+## Стек
+
+| Уровень | Технология |
+|---|---|
+| Frontend | Next.js 15 (App Router) + TypeScript |
+| Styling | Tailwind CSS + shadcn/ui |
+| Backend | Supabase (PostgreSQL, Auth, Realtime, Storage, Edge Functions) |
+
+## Структура репозитория
+
+```
+housesm/
+├── docs/
+├── public/
+│   ├── manifest.json
+│   └── icons/
+├── src/
+│   ├── app/
+│   │   ├── (auth)/login/
+│   │   ├── (auth)/verify/
+│   │   ├── (main)/feed/
+│   │   ├── (main)/chats/[chatId]/
+│   │   ├── (main)/classifieds/
+│   │   ├── (main)/hoa/
+│   │   └── (main)/profile/
+│   ├── components/
+│   │   ├── layout/        # BottomNav, Header
+│   │   ├── feed/          # PostCard, FeedFilter
+│   │   └── ui/            # shadcn/ui
+│   ├── lib/
+│   │   └── supabase/      # client.ts, server.ts, middleware.ts
+│   ├── types/             # database.types.ts, index.ts
+│   ├── hooks/
+│   └── stores/            # Zustand
+├── supabase/
+│   ├── migrations/
+│   │   ├── 001_initial_schema.sql
+│   │   └── 002_rls_policies.sql
+│   └── seed.sql
+├── middleware.ts
+├── .env.example
+├── next.config.ts
+├── tailwind.config.ts
+└── tsconfig.json
+```
+
+## Схема базы данных
+
+### Иерархия
+```
+complexes → buildings → entrances → apartments → profiles
+```
+
+### Таблицы
+
+#### complexes
+- id, name, address, city, created_at
+
+#### buildings
+- id, complex_id, number, created_at
+
+#### entrances
+- id, building_id, number, created_at
+
+#### apartments
+- id, entrance_id, number, floor, created_at
+
+#### profiles (расширение auth.users)
+- id (FK auth.users), phone, full_name, avatar_url
+- role: resident | hoa_official | service_provider | admin
+- apartment_id, complex_id, verified, verified_at, verified_by
+- bio, created_at, updated_at
+
+#### posts (polymorphic — все типы публикаций)
+- id, author_id, complex_id, building_id?, entrance_id?
+- type: post | announcement | service | help_request | poll | initiative | event | official_news | official_poll | fundraiser
+- title?, content, status: active | closed | archived | under_review
+- is_official, price?, currency?, territory: entrance | building | complex
+- views_count, created_at, updated_at
+
+#### post_attachments
+- id, post_id, url, type: image | document | video, size
+
+#### comments
+- id, post_id, author_id, parent_id?, content, created_at, updated_at
+
+#### reactions
+- id, post_id, user_id, type: like | support | thanks
+- UNIQUE(post_id, user_id)
+
+#### polls
+- id, post_id (UNIQUE), is_multiple, ends_at, total_votes
+
+#### poll_options
+- id, poll_id, text, votes_count, position
+
+#### poll_votes
+- id, poll_id, option_id, user_id, created_at
+- UNIQUE(poll_id, user_id) для single-choice
+
+#### initiatives
+- id, post_id (UNIQUE), stage: proposal | discussion | voting | hoa_review | approved | fundraising | implementation | completed | rejected
+- goal, supporters
+
+#### initiative_supports
+- id, initiative_id, user_id, UNIQUE(initiative_id, user_id)
+
+#### fundraisers
+- id, post_id (UNIQUE), initiative_id?, target_amount, current_amount, currency
+- payment_url, qr_url, ends_at, status: active | completed | cancelled
+
+#### fundraiser_payments
+- id, fundraiser_id, user_id, amount, comment, is_anonymous, confirmed_at
+
+#### chats
+- id, complex_id, building_id?, entrance_id?
+- type: complex | building | entrance | thematic | direct
+- name, description, avatar_url, is_official, created_by
+
+#### chat_members
+- id, chat_id, user_id, role: member | admin
+- joined_at, last_read_at, UNIQUE(chat_id, user_id)
+
+#### messages
+- id, chat_id, sender_id, reply_to_id?, content
+- type: text | image | document | system
+- is_deleted, created_at, updated_at
+
+#### service_providers
+- id, profile_id (UNIQUE), description, categories[], service_areas[]
+- rating, reviews_count, is_verified, recommended_by
+
+#### notifications
+- id, user_id, type, title, body, data jsonb, is_read
+
+#### moderation_logs
+- id, moderator_id, target_type, target_id, action, reason
+
+## RLS-стратегия
+
+| Таблица | Read | Write |
+|---|---|---|
+| complexes | все | admin |
+| profiles | члены того же ЖК | сам пользователь |
+| posts (обычные) | по territory | verified residents |
+| posts (official) | все члены ЖК | hoa_official |
+| chats/messages | члены чата | члены чата |
+| fundraisers | все члены ЖК | hoa_official |
+| poll_votes | — (агрегат) | сам пользователь |
+
+## Маршруты
+
+```
+/                     → /feed или /auth/login
+/(auth)/login         → вход по номеру телефона
+/(auth)/verify        → подтверждение OTP
+/(main)/feed          → социальная лента
+/(main)/chats         → список чатов
+/(main)/chats/[id]    → чат
+/(main)/classifieds   → объявления и услуги
+/(main)/hoa           → Мой ЖК (ОСИ)
+/(main)/profile       → профиль
+/admin                → панель администратора
+```
+
+## Поток авторизации
+
+```
+1. Номер телефона → OTP (Supabase Auth + SMS)
+2. OTP верификация → сессия
+3. Есть profile? → Нет: Onboarding (ЖК + квартира)
+4. verified? → Нет: экран ожидания | Да: /feed
+```
+
+## Realtime-подписки
+
+| Канал | Таблица | Событие |
+|---|---|---|
+| chat:{chatId} | messages | новое сообщение |
+| feed:{complexId} | posts | новая публикация |
+| notifications:{userId} | notifications | уведомление |
+| initiative:{id} | initiatives | смена статуса |
+| fundraiser:{id} | fundraisers | обновление прогресса |
+
+## Переменные окружения
+
+```
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+NEXT_PUBLIC_APP_URL=
+```
