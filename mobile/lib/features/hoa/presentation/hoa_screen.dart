@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radius.dart';
 import '../../../core/data/house_repository.dart';
+import '../../../core/widgets/empty_state.dart';
 import '../../feed/models/post.dart';
 
 class HoaScreen extends StatefulWidget {
@@ -15,6 +16,7 @@ class _HoaScreenState extends State<HoaScreen> {
   final repository = HouseRepository();
   List<Post> remotePosts = [];
   bool loaded = false;
+  bool hasError = false;
   String activeTab = 'Новости';
   final Set<String> votedPollIds = <String>{};
   final categories = [
@@ -35,7 +37,16 @@ class _HoaScreenState extends State<HoaScreen> {
     if (!repository.isConfigured) return;
     try {
       final posts = await repository.loadPosts();
-      if (mounted) setState(() => remotePosts = posts.where((p) => p.isOfficial || p.type == PostType.fundraiser || p.type == PostType.officialPoll).toList());
+      if (mounted) {
+        setState(() => remotePosts = posts
+            .where((p) =>
+                p.isOfficial ||
+                p.type == PostType.fundraiser ||
+                p.type == PostType.officialPoll)
+            .toList());
+      }
+    } catch (_) {
+      if (mounted) setState(() => hasError = true);
     } finally {
       if (mounted) setState(() => loaded = true);
     }
@@ -45,7 +56,22 @@ class _HoaScreenState extends State<HoaScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     if (repository.isConfigured) {
-      if (!loaded) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      if (!loaded) {
+        return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      }
+      if (hasError) {
+        return Scaffold(
+          body: ErrorView(
+              message: 'Не удалось загрузить раздел HOA',
+              onRetry: () {
+                setState(() {
+                  loaded = false;
+                  hasError = false;
+                });
+                _loadRemote();
+              }),
+        );
+      }
       return _buildRemote(context, isDark);
     }
     return Scaffold(
@@ -71,12 +97,14 @@ class _HoaScreenState extends State<HoaScreen> {
                 preferredSize: const Size.fromHeight(1),
                 child: Container(
                   height: 1,
-                  color: isDark ? AppColors.borderDark : const Color(0xFFF1F5F9),
+                  color:
+                      isDark ? AppColors.borderDark : const Color(0xFFF1F5F9),
                 ),
               ),
             ),
             SliverPadding(
-              padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).padding.bottom + 80),
+              padding: EdgeInsets.fromLTRB(
+                  16, 16, 16, MediaQuery.of(context).padding.bottom + 80),
               sliver: SliverList.list(
                 children: [
                   // Карточка ОСИ — как в вебе gradient + border + shadow
@@ -86,11 +114,16 @@ class _HoaScreenState extends State<HoaScreen> {
                       gradient: LinearGradient(
                         colors: isDark
                             ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
-                            : [const Color(0xFFDCFCE7), const Color(0xFFF0FDF4)],
+                            : [
+                                const Color(0xFFDCFCE7),
+                                const Color(0xFFF0FDF4)
+                              ],
                       ),
                       borderRadius: AppRadius.card,
                       border: Border.all(
-                        color: isDark ? AppColors.borderDark : const Color(0xFFBBF7D0),
+                        color: isDark
+                            ? AppColors.borderDark
+                            : const Color(0xFFBBF7D0),
                       ),
                     ),
                     child: Row(
@@ -109,7 +142,8 @@ class _HoaScreenState extends State<HoaScreen> {
                               ),
                             ],
                           ),
-                          child: const Icon(Icons.apartment, color: Colors.white, size: 24),
+                          child: const Icon(Icons.apartment,
+                              color: Colors.white, size: 24),
                         ),
                         const SizedBox(width: 14),
                         Expanded(
@@ -120,21 +154,26 @@ class _HoaScreenState extends State<HoaScreen> {
                                 children: [
                                   const Text(
                                     'ОСИ «Солнечный»',
-                                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                                    style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700),
                                   ),
                                   const SizedBox(width: 6),
-                                  const Icon(Icons.verified, size: 14, color: AppColors.primary),
+                                  const Icon(Icons.verified,
+                                      size: 14, color: AppColors.primary),
                                 ],
                               ),
                               const SizedBox(height: 2),
                               const Text(
                                 'Официальный аккаунт управления',
-                                style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                style: TextStyle(
+                                    fontSize: 11, color: Color(0xFF64748B)),
                               ),
                             ],
                           ),
                         ),
-                        const Icon(Icons.chevron_right, size: 20, color: Color(0xFF94A3B8)),
+                        const Icon(Icons.chevron_right,
+                            size: 20, color: Color(0xFF94A3B8)),
                       ],
                     ),
                   ),
@@ -143,7 +182,8 @@ class _HoaScreenState extends State<HoaScreen> {
                   GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 5,
                       mainAxisSpacing: 8,
                       crossAxisSpacing: 8,
@@ -154,7 +194,8 @@ class _HoaScreenState extends State<HoaScreen> {
                       final cat = categories[i];
                       final isActive = activeTab == cat['label'];
                       return GestureDetector(
-                        onTap: () => setState(() => activeTab = cat['label'] as String),
+                        onTap: () =>
+                            setState(() => activeTab = cat['label'] as String),
                         child: Column(
                           children: [
                             AnimatedContainer(
@@ -164,7 +205,9 @@ class _HoaScreenState extends State<HoaScreen> {
                               decoration: BoxDecoration(
                                 color: isActive
                                     ? AppColors.primary
-                                    : (isDark ? AppColors.secondaryDark : const Color(0xFFF1F5F9)),
+                                    : (isDark
+                                        ? AppColors.secondaryDark
+                                        : const Color(0xFFF1F5F9)),
                                 borderRadius: BorderRadius.circular(16),
                                 boxShadow: isActive
                                     ? const [
@@ -179,7 +222,9 @@ class _HoaScreenState extends State<HoaScreen> {
                               child: Icon(
                                 cat['icon'] as IconData,
                                 size: 22,
-                                color: isActive ? Colors.white : const Color(0xFF64748B),
+                                color: isActive
+                                    ? Colors.white
+                                    : const Color(0xFF64748B),
                               ),
                             ),
                             const SizedBox(height: 6),
@@ -190,7 +235,9 @@ class _HoaScreenState extends State<HoaScreen> {
                                 fontSize: 10,
                                 fontWeight: FontWeight.w500,
                                 height: 1.2,
-                                color: isActive ? AppColors.primary : const Color(0xFF64748B),
+                                color: isActive
+                                    ? AppColors.primary
+                                    : const Color(0xFF64748B),
                               ),
                             ),
                           ],
@@ -212,7 +259,9 @@ class _HoaScreenState extends State<HoaScreen> {
                       color: isDark ? AppColors.bgCardDark : Colors.white,
                       borderRadius: AppRadius.card,
                       border: Border.all(
-                        color: isDark ? AppColors.borderDark : const Color(0xFFF1F5F9),
+                        color: isDark
+                            ? AppColors.borderDark
+                            : const Color(0xFFF1F5F9),
                       ),
                       boxShadow: isDark
                           ? null
@@ -228,7 +277,8 @@ class _HoaScreenState extends State<HoaScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
                             color: const Color(0xFFEFF6FF),
                             borderRadius: BorderRadius.circular(999),
@@ -246,17 +296,22 @@ class _HoaScreenState extends State<HoaScreen> {
                         const SizedBox(height: 10),
                         const Text(
                           'Плановые работы в лифтах',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                          style: TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.w700),
                         ),
                         const SizedBox(height: 6),
                         const Text(
                           'С 20 по 25 мая в подъездах 1 и 2 будут проводиться плановые сервисные работы лифтового оборудования.',
-                          style: TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.5),
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF64748B),
+                              height: 1.5),
                         ),
                         const SizedBox(height: 8),
                         const Text(
                           '19 мая в 10:30',
-                          style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                          style:
+                              TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
                         ),
                       ],
                     ),
@@ -270,7 +325,9 @@ class _HoaScreenState extends State<HoaScreen> {
                       color: isDark ? AppColors.bgCardDark : Colors.white,
                       borderRadius: AppRadius.card,
                       border: Border.all(
-                        color: isDark ? AppColors.borderDark : const Color(0xFFF1F5F9),
+                        color: isDark
+                            ? AppColors.borderDark
+                            : const Color(0xFFF1F5F9),
                       ),
                     ),
                     child: Column(
@@ -278,19 +335,24 @@ class _HoaScreenState extends State<HoaScreen> {
                       children: [
                         const Text(
                           'Установка шлагбаума во дворе',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                          style: TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.w700),
                         ),
                         const SizedBox(height: 4),
                         const Text(
                           'Голосование до 26 мая',
-                          style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                          style:
+                              TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
                         ),
                         const SizedBox(height: 12),
                         SizedBox(
                           width: double.infinity,
                           child: FilledButton(
-                            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Опрос доступен после загрузки данных ЖК')),
+                            onPressed: () =>
+                                ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text(
+                                      'Опрос доступен после загрузки данных ЖК')),
                             ),
                             style: FilledButton.styleFrom(
                               backgroundColor: AppColors.primary,
@@ -321,7 +383,9 @@ class _HoaScreenState extends State<HoaScreen> {
                       color: isDark ? AppColors.bgCardDark : Colors.white,
                       borderRadius: AppRadius.card,
                       border: Border.all(
-                        color: isDark ? AppColors.borderDark : const Color(0xFFF1F5F9),
+                        color: isDark
+                            ? AppColors.borderDark
+                            : const Color(0xFFF1F5F9),
                       ),
                     ),
                     child: Column(
@@ -331,7 +395,8 @@ class _HoaScreenState extends State<HoaScreen> {
                           children: [
                             const Text(
                               'Благоустройство двора',
-                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                              style: TextStyle(
+                                  fontSize: 14, fontWeight: FontWeight.w700),
                             ),
                             const Text(
                               '62%',
@@ -350,7 +415,8 @@ class _HoaScreenState extends State<HoaScreen> {
                             value: 0.62,
                             minHeight: 8,
                             backgroundColor: const Color(0xFFF1F5F9),
-                            valueColor: const AlwaysStoppedAnimation(AppColors.primary),
+                            valueColor:
+                                const AlwaysStoppedAnimation(AppColors.primary),
                           ),
                         ),
                         const SizedBox(height: 10),
@@ -362,18 +428,22 @@ class _HoaScreenState extends State<HoaScreen> {
                                 children: [
                                   TextSpan(
                                     text: 'Собрано: ',
-                                    style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                    style: TextStyle(
+                                        fontSize: 11, color: Color(0xFF64748B)),
                                   ),
                                   TextSpan(
                                     text: '1 250 000 ₸',
-                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                                    style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700),
                                   ),
                                 ],
                               ),
                             ),
                             Text(
                               'Цель: 2 000 000 ₸',
-                              style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                              style: TextStyle(
+                                  fontSize: 11, color: Color(0xFF64748B)),
                             ),
                           ],
                         ),
@@ -404,47 +474,58 @@ class _HoaScreenState extends State<HoaScreen> {
                 return Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(post.title ?? post.type.label, style: const TextStyle(fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 8),
-                      Text(post.content),
-                      if (post.poll != null) ...[
-                        const SizedBox(height: 12),
-                        ...post.poll!.options.map((option) => ListTile(
-                              dense: true,
-                              title: Text(option.text),
-                              onTap: votedPollIds.contains(post.poll!.id)
-                                  ? null
-                                  : () async {
-                                      final messenger = ScaffoldMessenger.of(context);
-                                      final user = await repository.currentUser();
-                                      if (user == null) return;
-                                      try {
-                                        await repository.vote(post.poll!.id, option.id);
-                                        if (!mounted) return;
-                                        setState(() {
-                                          votedPollIds.add(post.poll!.id);
-                                          option.votesCount++;
-                                          post.poll!.totalVotes++;
-                                        });
-                                      } catch (_) {
-                                        if (mounted) {
-                                          messenger.showSnackBar(
-                                            const SnackBar(content: Text('Не удалось сохранить голос')),
-                                          );
-                                        }
-                                      }
-                                    },
-                              trailing: Text('${option.votesCount}'),
-                            )),
-                      ],
-                      if (post.fundraiser != null) ...[
-                        const SizedBox(height: 8),
-                        LinearProgressIndicator(value: post.fundraiser!.progress),
-                        const SizedBox(height: 6),
-                        Text('${post.fundraiser!.currentAmount} / ${post.fundraiser!.targetAmount} ${post.fundraiser!.currency}'),
-                      ],
-                    ]),
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(post.title ?? post.type.label,
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w700)),
+                          const SizedBox(height: 8),
+                          Text(post.content),
+                          if (post.poll != null) ...[
+                            const SizedBox(height: 12),
+                            ...post.poll!.options.map((option) => ListTile(
+                                  dense: true,
+                                  title: Text(option.text),
+                                  onTap: votedPollIds.contains(post.poll!.id)
+                                      ? null
+                                      : () async {
+                                          final messenger =
+                                              ScaffoldMessenger.of(context);
+                                          final user =
+                                              await repository.currentUser();
+                                          if (user == null) return;
+                                          try {
+                                            await repository.vote(
+                                                post.poll!.id, option.id);
+                                            if (!mounted) return;
+                                            setState(() {
+                                              votedPollIds.add(post.poll!.id);
+                                              option.votesCount++;
+                                              post.poll!.totalVotes++;
+                                            });
+                                          } catch (_) {
+                                            if (mounted) {
+                                              messenger.showSnackBar(
+                                                const SnackBar(
+                                                    content: Text(
+                                                        'Не удалось сохранить голос')),
+                                              );
+                                            }
+                                          }
+                                        },
+                                  trailing: Text('${option.votesCount}'),
+                                )),
+                          ],
+                          if (post.fundraiser != null) ...[
+                            const SizedBox(height: 8),
+                            LinearProgressIndicator(
+                                value: post.fundraiser!.progress),
+                            const SizedBox(height: 6),
+                            Text(
+                                '${post.fundraiser!.currentAmount} / ${post.fundraiser!.targetAmount} ${post.fundraiser!.currency}'),
+                          ],
+                        ]),
                   ),
                 );
               },
@@ -463,7 +544,8 @@ class _SectionHeader extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+        Text(title,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
         if (action != null)
           TextButton(
             onPressed: onAction,
