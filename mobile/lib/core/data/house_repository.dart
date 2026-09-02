@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../supabase/supabase_config.dart';
 import '../../features/feed/models/post.dart';
+import 'media_limits.dart';
 
 class HouseRepository {
   SupabaseClient get _client => SupabaseConfig.client;
@@ -178,17 +179,32 @@ class HouseRepository {
   }) async {
     final user = _client.auth.currentUser;
     if (user == null) throw Exception('Требуется авторизация');
+    if (bytes.length > maxUploadBytes) {
+      throw Exception('Размер файла не должен превышать 10 МБ');
+    }
+    if (!allowedUploadExtensions.contains(fileName.split('.').last.toLowerCase())) {
+      throw Exception('Поддерживаются только JPG, PNG, WEBP и PDF');
+    }
+    final normalizedMimeType = mimeType.toLowerCase();
+    if (!const {'image/jpeg', 'image/png', 'image/webp', 'application/pdf'}
+        .contains(normalizedMimeType)) {
+      throw Exception('Неподдерживаемый тип файла');
+    }
     final safeName = fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
     final path =
         '${user.id}/chats/$chatId/${DateTime.now().millisecondsSinceEpoch}_$safeName';
     await _client.storage
         .from('house-media')
-        .uploadBinary(path, Uint8List.fromList(bytes));
+        .uploadBinary(
+          path,
+          Uint8List.fromList(bytes),
+          fileOptions: FileOptions(contentType: normalizedMimeType, upsert: false),
+        );
     await _client.from('messages').insert({
       'chat_id': chatId,
       'sender_id': user.id,
       'content': path,
-      'type': mimeType.startsWith('image/') ? 'image' : 'document',
+      'type': normalizedMimeType.startsWith('image/') ? 'image' : 'document',
     });
   }
 

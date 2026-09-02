@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/data/house_repository.dart';
+import '../../../core/data/media_limits.dart';
 import '../../../core/supabase/supabase_config.dart';
 import '../../../core/theme/app_colors.dart';
 
@@ -125,10 +126,20 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   }
 
   Future<void> _pickAttachment() async {
-    final result =
-        await FilePicker.platform.pickFiles(withData: true, type: FileType.any);
+    final result = await FilePicker.platform.pickFiles(
+      withData: true,
+      type: FileType.custom,
+      allowedExtensions: allowedUploadExtensions.toList(),
+    );
     final file = result?.files.single;
     if (file == null || file.bytes == null || !mounted) {
+      return;
+    }
+    final extension = file.extension?.toLowerCase() ?? '';
+    if (file.size > maxUploadBytes || !allowedUploadExtensions.contains(extension)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Поддерживаются файлы JPG, PNG, WEBP и PDF до 10 МБ')),
+      );
       return;
     }
     ScaffoldMessenger.of(context)
@@ -138,11 +149,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         chatId: widget.chatId,
         fileName: file.name,
         bytes: file.bytes!,
-        mimeType: file.extension == 'png' ||
-                file.extension == 'jpg' ||
-                file.extension == 'jpeg'
-            ? 'image/${file.extension}'
-            : 'application/octet-stream',
+        mimeType: mimeTypeForExtension(extension),
       );
       await _loadMessages();
     } catch (_) {

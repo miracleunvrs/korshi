@@ -19,6 +19,7 @@ import type { PostWithAuthor } from "@/types";
 import { useAppStore } from "@/stores/appStore";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { IMAGE_UPLOAD_TYPES, validateUploadFile } from "@/lib/uploadLimits";
 
 export default function CreatePostPage() {
   const router = useRouter();
@@ -64,6 +65,14 @@ export default function CreatePostPage() {
       return;
     }
     setFormError("");
+
+    if (imageFile) {
+      const uploadError = validateUploadFile(imageFile, IMAGE_UPLOAD_TYPES);
+      if (uploadError) {
+        setFormError(uploadError);
+        return;
+      }
+    }
 
     setLoading(true);
 
@@ -349,7 +358,19 @@ export default function CreatePostPage() {
             type="file"
             accept="image/jpeg,image/png,image/webp"
             className="sr-only"
-            onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+            onChange={(e) => {
+              const file = e.target.files?.[0] || null;
+              if (file) {
+                const uploadError = validateUploadFile(file, IMAGE_UPLOAD_TYPES);
+                if (uploadError) {
+                  setFormError(uploadError);
+                  e.currentTarget.value = "";
+                  return;
+                }
+              }
+              setFormError("");
+              setImageFile(file);
+            }}
           />
         </label>
       </div>

@@ -7,6 +7,7 @@ import { ArrowLeft, CheckCircle2, ShieldAlert, UploadCloud, FileCheck } from "lu
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { useAppStore } from "@/stores/appStore";
+import { DOCUMENT_UPLOAD_TYPES, validateUploadFile } from "@/lib/uploadLimits";
 
 export default function VerifyResidentPage() {
   const router = useRouter();
@@ -26,7 +27,8 @@ export default function VerifyResidentPage() {
     try {
       if (isSupabaseConfigured()) {
         if (!document) throw new Error("Выберите документ для загрузки");
-        if (document.size > 10 * 1024 * 1024) throw new Error("Размер файла не должен превышать 10 МБ");
+        const validationError = validateUploadFile(document, DOCUMENT_UPLOAD_TYPES);
+        if (validationError) throw new Error(validationError);
 
         const path = `${currentUser.id}/verification/${crypto.randomUUID()}-${document.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
         const { error: uploadError } = await supabase.storage.from("house-media").upload(path, document, {
@@ -137,9 +139,21 @@ export default function VerifyResidentPage() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/png,image/jpeg,application/pdf"
+                accept="image/png,image/jpeg,image/webp,application/pdf"
                 className="hidden"
-                onChange={(event) => setDocument(event.target.files?.[0] || null)}
+                onChange={(event) => {
+                  const file = event.target.files?.[0] || null;
+                  if (file) {
+                    const uploadError = validateUploadFile(file, DOCUMENT_UPLOAD_TYPES);
+                    if (uploadError) {
+                      setError(uploadError);
+                      event.currentTarget.value = "";
+                      return;
+                    }
+                  }
+                  setError("");
+                  setDocument(file);
+                }}
               />
             </div>
 
