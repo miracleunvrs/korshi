@@ -7,6 +7,7 @@ import '../../../core/data/house_repository.dart';
 import '../../../core/data/media_limits.dart';
 import '../../../core/supabase/supabase_config.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/empty_state.dart';
 
 class ChatRoomScreen extends StatefulWidget {
   final String chatId;
@@ -21,6 +22,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   final _scrollController = ScrollController();
   final List<Map<String, dynamic>> messages = [];
   RealtimeChannel? _syncChannel;
+  bool hasError = false;
 
   @override
   void initState() {
@@ -53,6 +55,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           ? SupabaseConfig.client.auth.currentUser?.id
           : null;
       setState(() {
+        hasError = false;
         messages
           ..clear()
           ..addAll(rows.map((row) {
@@ -78,7 +81,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           }));
       });
     } catch (_) {
-      // Keep the local preview if the chat is not available yet.
+      if (mounted) setState(() => hasError = true);
     }
   }
 
@@ -136,9 +139,12 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       return;
     }
     final extension = file.extension?.toLowerCase() ?? '';
-    if (file.size > maxUploadBytes || !allowedUploadExtensions.contains(extension)) {
+    if (file.size > maxUploadBytes ||
+        !allowedUploadExtensions.contains(extension)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Поддерживаются файлы JPG, PNG, WEBP и PDF до 10 МБ')),
+        const SnackBar(
+            content:
+                Text('Поддерживаются файлы JPG, PNG, WEBP и PDF до 10 МБ')),
       );
       return;
     }
@@ -234,115 +240,123 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       body: Column(
         children: [
           Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-              itemCount: messages.length,
-              itemBuilder: (context, index) {
-                final m = messages[index];
-                final isMe = m['isMe'] as bool;
-                final isOfficial = m['isOfficial'] as bool;
-                return Align(
-                  alignment:
-                      isMe ? Alignment.centerRight : Alignment.centerLeft,
-                  child: Container(
-                    constraints: BoxConstraints(
-                        maxWidth: MediaQuery.of(context).size.width * 0.72),
-                    margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: isMe
-                          ? AppColors.primary
-                          : (isDark ? const Color(0xFF1E293B) : Colors.white),
-                      borderRadius: BorderRadius.only(
-                        topLeft: const Radius.circular(18),
-                        topRight: const Radius.circular(18),
-                        bottomLeft: Radius.circular(isMe ? 18 : 4),
-                        bottomRight: Radius.circular(isMe ? 4 : 18),
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                      border: isMe
-                          ? null
-                          : Border.all(
-                              color: isDark
-                                  ? const Color(0xFF334155)
-                                  : const Color(0xFFF1F5F9),
+            child: hasError
+                ? ErrorView(
+                    message: 'Не удалось загрузить сообщения',
+                    onRetry: _loadMessages)
+                : ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                    itemCount: messages.length,
+                    itemBuilder: (context, index) {
+                      final m = messages[index];
+                      final isMe = m['isMe'] as bool;
+                      final isOfficial = m['isOfficial'] as bool;
+                      return Align(
+                        alignment:
+                            isMe ? Alignment.centerRight : Alignment.centerLeft,
+                        child: Container(
+                          constraints: BoxConstraints(
+                              maxWidth:
+                                  MediaQuery.of(context).size.width * 0.72),
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: isMe
+                                ? AppColors.primary
+                                : (isDark
+                                    ? const Color(0xFF1E293B)
+                                    : Colors.white),
+                            borderRadius: BorderRadius.only(
+                              topLeft: const Radius.circular(18),
+                              topRight: const Radius.circular(18),
+                              bottomLeft: Radius.circular(isMe ? 18 : 4),
+                              bottomRight: Radius.circular(isMe ? 4 : 18),
                             ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: isMe
-                          ? CrossAxisAlignment.end
-                          : CrossAxisAlignment.start,
-                      children: [
-                        if (!isMe)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 4),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  m['sender'] as String,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    color: isOfficial
-                                        ? AppColors.primary
-                                        : const Color(0xFF64748B),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black
+                                    .withOpacity(isDark ? 0.2 : 0.04),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                            border: isMe
+                                ? null
+                                : Border.all(
+                                    color: isDark
+                                        ? const Color(0xFF334155)
+                                        : const Color(0xFFF1F5F9),
+                                  ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: isMe
+                                ? CrossAxisAlignment.end
+                                : CrossAxisAlignment.start,
+                            children: [
+                              if (!isMe)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 4),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        m['sender'] as String,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                          color: isOfficial
+                                              ? AppColors.primary
+                                              : const Color(0xFF64748B),
+                                        ),
+                                      ),
+                                      if (isOfficial) ...[
+                                        const SizedBox(width: 4),
+                                        const Icon(Icons.verified,
+                                            size: 10, color: AppColors.primary),
+                                      ],
+                                    ],
                                   ),
                                 ),
-                                if (isOfficial) ...[
-                                  const SizedBox(width: 4),
-                                  const Icon(Icons.verified,
-                                      size: 10, color: AppColors.primary),
-                                ],
-                              ],
-                            ),
-                          ),
-                        Text(
-                          m['text'] as String,
-                          style: TextStyle(
-                            color: isMe
-                                ? Colors.white
-                                : (isDark
-                                    ? const Color(0xFFE2E8F0)
-                                    : const Color(0xFF0F172A)),
-                            fontSize: 14,
-                            height: 1.4,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              m['time'] as String,
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: isMe
-                                    ? Colors.white70
-                                    : const Color(0xFF94A3B8),
+                              Text(
+                                m['text'] as String,
+                                style: TextStyle(
+                                  color: isMe
+                                      ? Colors.white
+                                      : (isDark
+                                          ? const Color(0xFFE2E8F0)
+                                          : const Color(0xFF0F172A)),
+                                  fontSize: 14,
+                                  height: 1.4,
+                                ),
                               ),
-                            ),
-                            if (isMe) ...[
-                              const SizedBox(width: 4),
-                              const Icon(Icons.done_all,
-                                  size: 12, color: Colors.white70),
+                              const SizedBox(height: 4),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    m['time'] as String,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: isMe
+                                          ? Colors.white70
+                                          : const Color(0xFF94A3B8),
+                                    ),
+                                  ),
+                                  if (isMe) ...[
+                                    const SizedBox(width: 4),
+                                    const Icon(Icons.done_all,
+                                        size: 12, color: Colors.white70),
+                                  ],
+                                ],
+                              ),
                             ],
-                          ],
+                          ),
                         ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
-                );
-              },
-            ),
           ),
           // Input — с учётом клавиатуры и SafeArea
           Container(

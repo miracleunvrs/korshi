@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/data/house_repository.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radius.dart';
+import '../../../core/widgets/empty_state.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -21,6 +22,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool verified = false;
   String avatarUrl = '';
   String? activeModal;
+  bool hasError = false;
 
   @override
   void initState() {
@@ -39,6 +41,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final entrance = asMap(apartmentData?['entrance']);
       final buildingData = asMap(entrance?['building']);
       setState(() {
+        hasError = false;
         fullName = profile['full_name'] ?? fullName;
         phone = profile['phone'] ?? phone;
         avatarUrl = profile['avatar_url'] ?? avatarUrl;
@@ -47,7 +50,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         building = buildingData?['number']?.toString() ?? building;
       });
     } catch (_) {
-      // The demo profile remains visible if the backend is unavailable.
+      if (mounted) setState(() => hasError = true);
     }
   }
 
@@ -72,7 +75,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
-          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          padding:
+              EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
           child: SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(20),
@@ -84,7 +88,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text('Редактирование профиля',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                          style: TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.w700)),
                       IconButton(
                           icon: const Icon(Icons.close, size: 20),
                           onPressed: () => Navigator.pop(ctx)),
@@ -94,13 +99,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _Field(label: 'Имя и Фамилия', controller: nameCtrl),
                   const SizedBox(height: 12),
                   _Field(
-                      label: 'Телефон', controller: phoneCtrl, keyboardType: TextInputType.phone),
+                      label: 'Телефон',
+                      controller: phoneCtrl,
+                      keyboardType: TextInputType.phone),
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      Expanded(child: _Field(label: 'Дом №', controller: buildingCtrl)),
+                      Expanded(
+                          child:
+                              _Field(label: 'Дом №', controller: buildingCtrl)),
                       const SizedBox(width: 12),
-                      Expanded(child: _Field(label: 'Квартира №', controller: apartmentCtrl)),
+                      Expanded(
+                          child: _Field(
+                              label: 'Квартира №', controller: apartmentCtrl)),
                     ],
                   ),
                   const SizedBox(height: 20),
@@ -115,11 +126,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           apartment = apartmentCtrl.text;
                         });
                         try {
-                          await _repository.updateProfile(fullName: fullName, phone: phone);
+                          await _repository.updateProfile(
+                              fullName: fullName, phone: phone);
                         } catch (_) {
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Не удалось сохранить профиль')),
+                              const SnackBar(
+                                  content:
+                                      Text('Не удалось сохранить профиль')),
                             );
                           }
                         }
@@ -128,10 +142,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       style: FilledButton.styleFrom(
                         backgroundColor: AppColors.primary,
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
                       ),
                       child: const Text('Сохранить изменения',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700)),
                     ),
                   ),
                 ],
@@ -165,7 +182,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(_modalTitle(id),
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                          style: const TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.w700)),
                       IconButton(
                           icon: const Icon(Icons.close, size: 20),
                           onPressed: () => Navigator.pop(ctx)),
@@ -177,7 +195,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   SizedBox(
                       width: double.infinity,
                       child: FilledButton.tonal(
-                          onPressed: () => Navigator.pop(ctx), child: const Text('Закрыть'))),
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Закрыть'))),
                 ],
               ),
             ),
@@ -228,21 +247,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   padding: const EdgeInsets.only(right: 12),
                   child: TextButton.icon(
                     onPressed: _openEdit,
-                    icon: const Icon(Icons.edit_outlined, size: 14, color: AppColors.primary),
+                    icon: const Icon(Icons.edit_outlined,
+                        size: 14, color: AppColors.primary),
                     label: const Text('Редактировать',
                         style: TextStyle(
-                            color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.w600)),
+                            color: AppColors.primary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600)),
                     style: TextButton.styleFrom(
                         backgroundColor: const Color(0xFFEFF6FF),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(999)),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6)),
                   ),
                 ),
               ],
               bottom: PreferredSize(
                   preferredSize: const Size.fromHeight(1),
                   child: Container(
-                      height: 1, color: isDark ? AppColors.borderDark : const Color(0xFFF1F5F9))),
+                      height: 1,
+                      color: isDark
+                          ? AppColors.borderDark
+                          : const Color(0xFFF1F5F9))),
+            ),
+            SliverToBoxAdapter(
+              child: hasError
+                  ? ErrorView(
+                      message: 'Не удалось загрузить профиль',
+                      onRetry: _loadRemoteProfile)
+                  : const SizedBox.shrink(),
             ),
             SliverToBoxAdapter(
               child: Column(
@@ -260,7 +294,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               height: 80,
                               decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(24),
-                                  border: Border.all(color: const Color(0xFFDCFCE7), width: 3),
+                                  border: Border.all(
+                                      color: const Color(0xFFDCFCE7), width: 3),
                                   boxShadow: const [
                                     BoxShadow(
                                         color: Color(0x14000000),
@@ -272,8 +307,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 child: CachedNetworkImage(
                                     imageUrl: avatarUrl,
                                     fit: BoxFit.cover,
-                                    placeholder: (_, __) =>
-                                        Container(color: const Color(0xFFDCFCE7)),
+                                    placeholder: (_, __) => Container(
+                                        color: const Color(0xFFDCFCE7)),
                                     errorWidget: (_, __, ___) => Container(
                                         color: const Color(0xFFDCFCE7),
                                         child: const Icon(Icons.person))),
@@ -289,7 +324,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       decoration: BoxDecoration(
                                           color: AppColors.primary,
                                           shape: BoxShape.circle,
-                                          border: Border.all(color: Colors.white, width: 2)),
+                                          border: Border.all(
+                                              color: Colors.white, width: 2)),
                                       child: const Icon(Icons.verified,
                                           size: 14, color: Colors.white))),
                           ],
@@ -299,37 +335,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w800,
-                                color: isDark ? Colors.white : const Color(0xFF0F172A))),
+                                color: isDark
+                                    ? Colors.white
+                                    : const Color(0xFF0F172A))),
                         const SizedBox(height: 4),
-                        Text(phone, style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+                        Text(phone,
+                            style: const TextStyle(
+                                fontSize: 12, color: Color(0xFF94A3B8))),
                         const SizedBox(height: 12),
                         Wrap(
                           alignment: WrapAlignment.center,
                           spacing: 8,
                           children: [
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
                               decoration: BoxDecoration(
                                   color: const Color(0xFFF1F5F9),
                                   borderRadius: BorderRadius.circular(999)),
-                              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                                const Icon(Icons.place_outlined,
-                                    size: 12, color: AppColors.primary),
-                                const SizedBox(width: 4),
-                                Text('Дом $building, кв. $apartment',
-                                    style: const TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                        color: Color(0xFF475569)))
-                              ]),
+                              child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.place_outlined,
+                                        size: 12, color: AppColors.primary),
+                                    const SizedBox(width: 4),
+                                    Text('Дом $building, кв. $apartment',
+                                        style: const TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF475569)))
+                                  ]),
                             ),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 6),
                               decoration: BoxDecoration(
-                                  color:
-                                      verified ? const Color(0xFFDCFCE7) : const Color(0xFFFEF3C7),
+                                  color: verified
+                                      ? const Color(0xFFDCFCE7)
+                                      : const Color(0xFFFEF3C7),
                                   borderRadius: BorderRadius.circular(999)),
-                              child: Text(verified ? '✓ Подтверждён' : 'Ожидает',
+                              child: Text(
+                                  verified ? '✓ Подтверждён' : 'Ожидает',
                                   style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
@@ -353,25 +399,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: Row(
                         children: [
                           const Expanded(
-                              child:
-                                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text('Статус жителя не подтверждён',
-                                style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xFF92400E))),
-                            Text('Загрузите документ для полного доступа',
-                                style: TextStyle(fontSize: 11, color: Color(0xFFB45309)))
-                          ])),
+                              child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                Text('Статус жителя не подтверждён',
+                                    style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF92400E))),
+                                Text('Загрузите документ для полного доступа',
+                                    style: TextStyle(
+                                        fontSize: 11, color: Color(0xFFB45309)))
+                              ])),
                           FilledButton(
-                              onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Откройте веб-версию для загрузки документа')),
-                              ),
+                              onPressed: () =>
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                        content: Text(
+                                            'Откройте веб-версию для загрузки документа')),
+                                  ),
                               style: FilledButton.styleFrom(
                                   backgroundColor: AppColors.primary,
                                   shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(10)),
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8)),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 14, vertical: 8)),
                               child: const Text('Подтвердить',
                                   style: TextStyle(
                                       fontSize: 11,
@@ -386,7 +438,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         color: isDark ? AppColors.bgCardDark : Colors.white,
                         border: Border.symmetric(
                             horizontal: BorderSide(
-                                color: isDark ? AppColors.borderDark : const Color(0xFFF1F5F9)))),
+                                color: isDark
+                                    ? AppColors.borderDark
+                                    : const Color(0xFFF1F5F9)))),
                     child: Column(
                       children: [
                         _MenuRow(
@@ -422,14 +476,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     TextButton.icon(
                       onPressed: _signOut,
                       icon: const Icon(Icons.logout, color: Colors.redAccent),
-                      label: const Text('Выйти из аккаунта', style: TextStyle(color: Colors.redAccent)),
+                      label: const Text('Выйти из аккаунта',
+                          style: TextStyle(color: Colors.redAccent)),
                     ),
                   Padding(
-                      padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 80),
+                      padding: EdgeInsets.only(
+                          bottom: MediaQuery.of(context).padding.bottom + 80),
                       child: Text('Korshi • версия 1.0.0',
                           style: TextStyle(
                               fontSize: 11,
-                              color: isDark ? const Color(0xFF475569) : const Color(0xFF94A3B8)))),
+                              color: isDark
+                                  ? const Color(0xFF475569)
+                                  : const Color(0xFF94A3B8)))),
                 ],
               ),
             ),
@@ -448,8 +506,9 @@ class _ModalBody extends StatelessWidget {
     if (id == 'payments') {
       return Container(
         padding: const EdgeInsets.all(12),
-        decoration:
-            BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(12)),
+        decoration: BoxDecoration(
+            color: const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(12)),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -457,13 +516,17 @@ class _ModalBody extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: const [
                 Text('Благоустройство двора',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                Text('15 мая 2026', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
+                    style:
+                        TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                Text('15 мая 2026',
+                    style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
               ],
             ),
             const Text('+ 5 000 ₸',
-                style:
-                    TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF15803D))),
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF15803D))),
           ],
         ),
       );
@@ -492,7 +555,10 @@ class _MenuRow extends StatelessWidget {
   final VoidCallback onTap;
   final bool showDivider;
   const _MenuRow(
-      {required this.icon, required this.label, required this.onTap, this.showDivider = true});
+      {required this.icon,
+      required this.label,
+      required this.onTap,
+      this.showDivider = true});
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -503,8 +569,10 @@ class _MenuRow extends StatelessWidget {
         decoration: BoxDecoration(
             border: showDivider
                 ? Border(
-                    bottom:
-                        BorderSide(color: isDark ? AppColors.borderDark : const Color(0xFFF1F5F9)))
+                    bottom: BorderSide(
+                        color: isDark
+                            ? AppColors.borderDark
+                            : const Color(0xFFF1F5F9)))
                 : null),
         child: Row(
           children: [
@@ -512,7 +580,9 @@ class _MenuRow extends StatelessWidget {
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                    color: isDark ? AppColors.secondaryDark : const Color(0xFFF1F5F9),
+                    color: isDark
+                        ? AppColors.secondaryDark
+                        : const Color(0xFFF1F5F9),
                     borderRadius: BorderRadius.circular(10)),
                 child: Icon(icon, size: 16, color: const Color(0xFF64748B))),
             const SizedBox(width: 12),
@@ -521,7 +591,8 @@ class _MenuRow extends StatelessWidget {
                     style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: isDark ? Colors.white : const Color(0xFF0F172A)))),
+                        color:
+                            isDark ? Colors.white : const Color(0xFF0F172A)))),
             const Icon(Icons.chevron_right, size: 18, color: Color(0xFF94A3B8)),
           ],
         ),
@@ -534,7 +605,8 @@ class _Field extends StatelessWidget {
   final String label;
   final TextEditingController controller;
   final TextInputType? keyboardType;
-  const _Field({required this.label, required this.controller, this.keyboardType});
+  const _Field(
+      {required this.label, required this.controller, this.keyboardType});
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -543,23 +615,31 @@ class _Field extends StatelessWidget {
       children: [
         Text(label,
             style: const TextStyle(
-                fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF64748B))),
         const SizedBox(height: 6),
         TextField(
           controller: controller,
           keyboardType: keyboardType,
           decoration: InputDecoration(
             filled: true,
-            fillColor: isDark ? const Color(0xFF27272A) : const Color(0xFFF8FAFC),
+            fillColor:
+                isDark ? const Color(0xFF27272A) : const Color(0xFFF8FAFC),
             border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide:
-                    BorderSide(color: isDark ? const Color(0xFF3F3F46) : const Color(0xFFE2E8F0))),
+                borderSide: BorderSide(
+                    color: isDark
+                        ? const Color(0xFF3F3F46)
+                        : const Color(0xFFE2E8F0))),
             enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide:
-                    BorderSide(color: isDark ? const Color(0xFF3F3F46) : const Color(0xFFE2E8F0))),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                borderSide: BorderSide(
+                    color: isDark
+                        ? const Color(0xFF3F3F46)
+                        : const Color(0xFFE2E8F0))),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             isDense: true,
           ),
           style: const TextStyle(fontSize: 13),

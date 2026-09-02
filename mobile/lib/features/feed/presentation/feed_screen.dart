@@ -22,6 +22,7 @@ class _FeedScreenState extends State<FeedScreen> {
   bool isLoading = false;
   bool hasError = false;
   bool isOffline = false;
+  bool notificationsError = false;
   List<Post> posts = <Post>[];
   List<Map<String, dynamic>> notifications = <Map<String, dynamic>>[];
   final HouseRepository repository = HouseRepository();
@@ -103,9 +104,14 @@ class _FeedScreenState extends State<FeedScreen> {
   Future<void> _loadNotifications() async {
     try {
       final rows = await repository.loadNotifications();
-      if (mounted) setState(() => notifications = rows);
+      if (mounted) {
+        setState(() {
+          notifications = rows;
+          notificationsError = false;
+        });
+      }
     } catch (_) {
-      // Ошибка уведомлений не должна блокировать ленту.
+      if (mounted) setState(() => notificationsError = true);
     }
   }
 
@@ -118,36 +124,41 @@ class _FeedScreenState extends State<FeedScreen> {
       showDragHandle: true,
       builder: (sheetContext) => SizedBox(
         height: MediaQuery.of(sheetContext).size.height * 0.65,
-        child: notifications.isEmpty
-            ? const Center(child: Text('Пока уведомлений нет'))
-            : ListView.separated(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                itemCount: notifications.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
-                itemBuilder: (_, index) {
-                  final notification = notifications[index];
-                  final isRead = notification['is_read'] == true;
-                  return ListTile(
-                    tileColor: isRead ? null : const Color(0xFFEFFAF2),
-                    title: Text('${notification['title'] ?? 'Уведомление'}',
-                        style: const TextStyle(fontWeight: FontWeight.w700)),
-                    subtitle: Text('${notification['body'] ?? ''}'),
-                    trailing: Text(
-                        '${notification['created_at']}'.substring(0, 10),
-                        style: const TextStyle(
-                            fontSize: 10, color: Color(0xFF94A3B8))),
-                    onTap: () async {
-                      if (!isRead) {
-                        await repository
-                            .markNotificationRead('${notification['id']}');
-                        if (mounted) {
-                          setState(() => notification['is_read'] = true);
-                        }
-                      }
+        child: notificationsError
+            ? ErrorView(
+                message: 'Не удалось загрузить уведомления',
+                onRetry: _loadNotifications)
+            : notifications.isEmpty
+                ? const Center(child: Text('Пока уведомлений нет'))
+                : ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                    itemCount: notifications.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (_, index) {
+                      final notification = notifications[index];
+                      final isRead = notification['is_read'] == true;
+                      return ListTile(
+                        tileColor: isRead ? null : const Color(0xFFEFFAF2),
+                        title: Text('${notification['title'] ?? 'Уведомление'}',
+                            style:
+                                const TextStyle(fontWeight: FontWeight.w700)),
+                        subtitle: Text('${notification['body'] ?? ''}'),
+                        trailing: Text(
+                            '${notification['created_at']}'.substring(0, 10),
+                            style: const TextStyle(
+                                fontSize: 10, color: Color(0xFF94A3B8))),
+                        onTap: () async {
+                          if (!isRead) {
+                            await repository
+                                .markNotificationRead('${notification['id']}');
+                            if (mounted) {
+                              setState(() => notification['is_read'] = true);
+                            }
+                          }
+                        },
+                      );
                     },
-                  );
-                },
-              ),
+                  ),
       ),
     );
   }
@@ -373,7 +384,7 @@ class _FeedScreenState extends State<FeedScreen> {
               child: hasError
                   ? ErrorView(
                       message: 'Не удалось загрузить ленту',
-                      onRetry: () => setState(() => hasError = false),
+                      onRetry: _loadRemotePosts,
                     )
                   : isLoading
                       ? ListView.builder(

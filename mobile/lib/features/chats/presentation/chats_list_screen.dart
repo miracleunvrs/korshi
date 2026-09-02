@@ -17,6 +17,7 @@ class _ChatsListScreenState extends State<ChatsListScreen> {
   String activeTab = 'all';
   String searchQuery = '';
   bool isLoading = false;
+  bool hasError = false;
   List<Map<String, dynamic>>? remoteChats;
   final repository = HouseRepository();
   RealtimeChannel? _syncChannel;
@@ -40,18 +41,23 @@ class _ChatsListScreenState extends State<ChatsListScreen> {
 
   @override
   void dispose() {
-    if (_syncChannel != null) Supabase.instance.client.removeChannel(_syncChannel!);
+    if (_syncChannel != null) {
+      Supabase.instance.client.removeChannel(_syncChannel!);
+    }
     super.dispose();
   }
 
   Future<void> _load() async {
-    setState(() => isLoading = true);
+    setState(() {
+      isLoading = true;
+      hasError = false;
+    });
     if (repository.isConfigured) {
       try {
         final rows = await repository.loadChats();
         if (mounted) setState(() => remoteChats = rows);
       } catch (_) {
-        // Keep the demo list visible if the backend is temporarily unavailable.
+        if (mounted) setState(() => hasError = true);
       }
     } else {
       await Future.delayed(const Duration(milliseconds: 500));
@@ -74,7 +80,9 @@ class _ChatsListScreenState extends State<ChatsListScreen> {
     final filtered = normalized.where((c) {
       if (activeTab == 'unread' && (c['unread'] as int) == 0) return false;
       if (searchQuery.isNotEmpty &&
-          !(c['name'] as String).toLowerCase().contains(searchQuery.toLowerCase())) {
+          !(c['name'] as String)
+              .toLowerCase()
+              .contains(searchQuery.toLowerCase())) {
         return false;
       }
       return true;
@@ -92,7 +100,8 @@ class _ChatsListScreenState extends State<ChatsListScreen> {
                 color: isDark ? AppColors.backgroundDark : Colors.white,
                 border: Border(
                   bottom: BorderSide(
-                    color: isDark ? AppColors.borderDark : const Color(0xFFF1F5F9),
+                    color:
+                        isDark ? AppColors.borderDark : const Color(0xFFF1F5F9),
                   ),
                 ),
               ),
@@ -112,7 +121,8 @@ class _ChatsListScreenState extends State<ChatsListScreen> {
                         ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
                           color: const Color(0xFFEFF6FF),
                           borderRadius: BorderRadius.circular(999),
@@ -139,10 +149,14 @@ class _ChatsListScreenState extends State<ChatsListScreen> {
                     onChanged: (v) => setState(() => searchQuery = v),
                     decoration: InputDecoration(
                       hintText: 'Поиск по чатам и сообщениям',
-                      prefixIcon: const Icon(Icons.search, size: 18, color: Color(0xFF94A3B8)),
+                      prefixIcon: const Icon(Icons.search,
+                          size: 18, color: Color(0xFF94A3B8)),
                       filled: true,
-                      fillColor: isDark ? AppColors.secondaryDark : const Color(0xFFF1F5F9),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      fillColor: isDark
+                          ? AppColors.secondaryDark
+                          : const Color(0xFFF1F5F9),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide.none,
@@ -177,154 +191,189 @@ class _ChatsListScreenState extends State<ChatsListScreen> {
               ),
             ),
             Expanded(
-              child: isLoading
-                  ? ListView.builder(
-                      itemCount: 5,
-                      itemBuilder: (_, __) => Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        child: Row(
-                          children: [
-                            const ShimmerBox(width: 48, height: 48, radius: 16),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  ShimmerBox(width: 140, height: 12, radius: 6),
-                                  SizedBox(height: 8),
-                                  ShimmerBox(width: 200, height: 10, radius: 6),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                  : filtered.isEmpty
-                      ? const EmptyState(
-                          icon: Icons.chat_bubble_outline,
-                          title: 'Чатов не найдено',
-                          subtitle: 'Попробуйте изменить поиск или фильтры',
-                        )
-                      : RefreshIndicator(
-                          onRefresh: _load,
-                          color: AppColors.primary,
-                          child: ListView.separated(
-                            padding: EdgeInsets.only(
-                              bottom: MediaQuery.of(context).padding.bottom + 80,
-                            ),
-                            itemCount: filtered.length,
-                            separatorBuilder: (_, __) => Divider(
-                              height: 1,
-                              indent: 78,
-                              color: isDark ? AppColors.borderDark : const Color(0xFFF1F5F9),
-                            ),
-                            itemBuilder: (context, i) {
-                              final c = filtered[i];
-                              final unread = c['unread'] as int;
-                              return InkWell(
-                                onTap: () => context.push('/chats/${c['id']}'),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                                  child: Row(
+              child: hasError
+                  ? ErrorView(
+                      message: 'Не удалось загрузить список чатов',
+                      onRetry: _load)
+                  : isLoading
+                      ? ListView.builder(
+                          itemCount: 5,
+                          itemBuilder: (_, __) => Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
+                            child: Row(
+                              children: [
+                                const ShimmerBox(
+                                    width: 48, height: 48, radius: 16),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      Container(
-                                        width: 48,
-                                        height: 48,
-                                        decoration: BoxDecoration(
-                                          color: c['color'] as Color,
-                                          borderRadius: BorderRadius.circular(16),
-                                        ),
-                                        child: Center(
-                                          child: Text(
-                                            c['icon'] as String,
-                                            style: const TextStyle(fontSize: 20),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 14),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Row(
-                                              children: [
-                                                Expanded(
-                                                  child: Text(
-                                                    c['name'] as String,
-                                                    style: const TextStyle(
-                                                      fontSize: 14,
-                                                      fontWeight: FontWeight.w600,
-                                                    ),
-                                                    overflow: TextOverflow.ellipsis,
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 8),
-                                                Text(
-                                                  c['time'] as String,
-                                                  style: const TextStyle(
-                                                    fontSize: 11,
-                                                    color: Color(0xFF94A3B8),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Row(
-                                              children: [
-                                                Expanded(
-                                                  child: Text(
-                                                    c['msg'] as String,
-                                                    maxLines: 1,
-                                                    overflow: TextOverflow.ellipsis,
-                                                    style: const TextStyle(
-                                                      fontSize: 12,
-                                                      color: Color(0xFF64748B),
-                                                    ),
-                                                  ),
-                                                ),
-                                                if (unread > 0) ...[
-                                                  const SizedBox(width: 8),
-                                                  Container(
-                                                    constraints: const BoxConstraints(
-                                                      minWidth: 20,
-                                                      minHeight: 20,
-                                                    ),
-                                                    padding: const EdgeInsets.symmetric(
-                                                      horizontal: 6,
-                                                      vertical: 2,
-                                                    ),
-                                                    decoration: const BoxDecoration(
-                                                      color: AppColors.primary,
-                                                      shape: BoxShape.rectangle,
-                                                      borderRadius: BorderRadius.all(
-                                                        Radius.circular(999),
-                                                      ),
-                                                    ),
-                                                    child: Center(
-                                                      child: Text(
-                                                        '$unread',
-                                                        style: const TextStyle(
-                                                          color: Colors.white,
-                                                          fontSize: 11,
-                                                          fontWeight: FontWeight.w700,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ],
-                                              ],
-                                            ),
-                                          ],
-                                        ),
-                                      ),
+                                      ShimmerBox(
+                                          width: 140, height: 12, radius: 6),
+                                      SizedBox(height: 8),
+                                      ShimmerBox(
+                                          width: 200, height: 10, radius: 6),
                                     ],
                                   ),
                                 ),
-                              );
-                            },
+                              ],
+                            ),
                           ),
-                        ),
+                        )
+                      : filtered.isEmpty
+                          ? const EmptyState(
+                              icon: Icons.chat_bubble_outline,
+                              title: 'Чатов не найдено',
+                              subtitle: 'Попробуйте изменить поиск или фильтры',
+                            )
+                          : RefreshIndicator(
+                              onRefresh: _load,
+                              color: AppColors.primary,
+                              child: ListView.separated(
+                                padding: EdgeInsets.only(
+                                  bottom:
+                                      MediaQuery.of(context).padding.bottom +
+                                          80,
+                                ),
+                                itemCount: filtered.length,
+                                separatorBuilder: (_, __) => Divider(
+                                  height: 1,
+                                  indent: 78,
+                                  color: isDark
+                                      ? AppColors.borderDark
+                                      : const Color(0xFFF1F5F9),
+                                ),
+                                itemBuilder: (context, i) {
+                                  final c = filtered[i];
+                                  final unread = c['unread'] as int;
+                                  return InkWell(
+                                    onTap: () =>
+                                        context.push('/chats/${c['id']}'),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 16, vertical: 14),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            width: 48,
+                                            height: 48,
+                                            decoration: BoxDecoration(
+                                              color: c['color'] as Color,
+                                              borderRadius:
+                                                  BorderRadius.circular(16),
+                                            ),
+                                            child: Center(
+                                              child: Text(
+                                                c['icon'] as String,
+                                                style: const TextStyle(
+                                                    fontSize: 20),
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 14),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    Expanded(
+                                                      child: Text(
+                                                        c['name'] as String,
+                                                        style: const TextStyle(
+                                                          fontSize: 14,
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                        ),
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Text(
+                                                      c['time'] as String,
+                                                      style: const TextStyle(
+                                                        fontSize: 11,
+                                                        color:
+                                                            Color(0xFF94A3B8),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Row(
+                                                  children: [
+                                                    Expanded(
+                                                      child: Text(
+                                                        c['msg'] as String,
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                        style: const TextStyle(
+                                                          fontSize: 12,
+                                                          color:
+                                                              Color(0xFF64748B),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    if (unread > 0) ...[
+                                                      const SizedBox(width: 8),
+                                                      Container(
+                                                        constraints:
+                                                            const BoxConstraints(
+                                                          minWidth: 20,
+                                                          minHeight: 20,
+                                                        ),
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .symmetric(
+                                                          horizontal: 6,
+                                                          vertical: 2,
+                                                        ),
+                                                        decoration:
+                                                            const BoxDecoration(
+                                                          color:
+                                                              AppColors.primary,
+                                                          shape: BoxShape
+                                                              .rectangle,
+                                                          borderRadius:
+                                                              BorderRadius.all(
+                                                            Radius.circular(
+                                                                999),
+                                                          ),
+                                                        ),
+                                                        child: Center(
+                                                          child: Text(
+                                                            '$unread',
+                                                            style:
+                                                                const TextStyle(
+                                                              color:
+                                                                  Colors.white,
+                                                              fontSize: 11,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w700,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
             ),
           ],
         ),
@@ -337,7 +386,8 @@ class _TabChip extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
-  const _TabChip({required this.label, required this.selected, required this.onTap});
+  const _TabChip(
+      {required this.label, required this.selected, required this.onTap});
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
