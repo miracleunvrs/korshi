@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -47,19 +48,30 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     try {
       final rows = await repository.loadMessages(widget.chatId);
       if (!mounted) return;
-      final userId = repository.isConfigured ? SupabaseConfig.client.auth.currentUser?.id : null;
+      final userId = repository.isConfigured
+          ? SupabaseConfig.client.auth.currentUser?.id
+          : null;
       setState(() {
         messages
           ..clear()
           ..addAll(rows.map((row) {
             final sender = row['sender'] is List
-                ? ((row['sender'] as List).isEmpty ? null : (row['sender'] as List).first)
+                ? ((row['sender'] as List).isEmpty
+                    ? null
+                    : (row['sender'] as List).first)
                 : row['sender'];
             return {
-              'text': row['is_deleted'] == true ? 'Сообщение удалено' : row['content'] ?? '',
+              'text': row['is_deleted'] == true
+                  ? 'Сообщение удалено'
+                  : row['type'] == 'image'
+                      ? '🖼️ Изображение'
+                      : row['type'] == 'document'
+                          ? '📎 Документ'
+                          : row['content'] ?? '',
               'isMe': row['sender_id'] == userId,
               'time': '${row['created_at']}'.substring(11, 16),
-              'sender': sender is Map ? sender['full_name'] ?? 'Сосед' : 'Сосед',
+              'sender':
+                  sender is Map ? sender['full_name'] ?? 'Сосед' : 'Сосед',
               'isOfficial': sender is Map && sender['role'] == 'hoa_official',
             };
           }));
@@ -73,7 +85,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     if (_controller.text.trim().isEmpty) return;
     final text = _controller.text.trim();
     final now = TimeOfDay.now();
-    final time = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    final time =
+        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
     setState(() {
       messages.add({
         'text': text,
@@ -85,10 +98,12 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       _controller.clear();
     });
     if (repository.isConfigured) {
-      final user = repository.isConfigured ? SupabaseConfig.client.auth.currentUser : null;
+      final user = repository.isConfigured
+          ? SupabaseConfig.client.auth.currentUser
+          : null;
       if (user != null) {
         try {
-      await repository.sendMessage(widget.chatId, text);
+          await repository.sendMessage(widget.chatId, text);
         } catch (_) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -109,9 +124,41 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     });
   }
 
+  Future<void> _pickAttachment() async {
+    final result =
+        await FilePicker.platform.pickFiles(withData: true, type: FileType.any);
+    final file = result?.files.single;
+    if (file == null || file.bytes == null || !mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('Загружаем файл…')));
+    try {
+      await repository.sendAttachment(
+        chatId: widget.chatId,
+        fileName: file.name,
+        bytes: file.bytes!,
+        mimeType: file.extension == 'png' ||
+                file.extension == 'jpg' ||
+                file.extension == 'jpeg'
+            ? 'image/${file.extension}'
+            : 'application/octet-stream',
+      );
+      await _loadMessages();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Не удалось загрузить вложение')),
+        );
+      }
+    }
+  }
+
   @override
   void dispose() {
-    if (_syncChannel != null) Supabase.instance.client.removeChannel(_syncChannel!);
+    if (_syncChannel != null) {
+      Supabase.instance.client.removeChannel(_syncChannel!);
+    }
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -153,13 +200,17 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
             ),
             const Text(
               '48 соседей онлайн',
-              style: TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w500),
+              style: TextStyle(
+                  fontSize: 11,
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w500),
             ),
           ],
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.more_vert, size: 20, color: Color(0xFF94A3B8)),
+            icon:
+                const Icon(Icons.more_vert, size: 20, color: Color(0xFF94A3B8)),
             onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Настройки чата пока недоступны')),
             ),
@@ -185,11 +236,14 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 final isMe = m['isMe'] as bool;
                 final isOfficial = m['isOfficial'] as bool;
                 return Align(
-                  alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                  alignment:
+                      isMe ? Alignment.centerRight : Alignment.centerLeft,
                   child: Container(
-                    constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
+                    constraints: BoxConstraints(
+                        maxWidth: MediaQuery.of(context).size.width * 0.72),
                     margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
                       color: isMe
                           ? AppColors.primary
@@ -210,11 +264,15 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                       border: isMe
                           ? null
                           : Border.all(
-                              color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                              color: isDark
+                                  ? const Color(0xFF334155)
+                                  : const Color(0xFFF1F5F9),
                             ),
                     ),
                     child: Column(
-                      crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                      crossAxisAlignment: isMe
+                          ? CrossAxisAlignment.end
+                          : CrossAxisAlignment.start,
                       children: [
                         if (!isMe)
                           Padding(
@@ -227,12 +285,15 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w700,
-                                    color: isOfficial ? AppColors.primary : const Color(0xFF64748B),
+                                    color: isOfficial
+                                        ? AppColors.primary
+                                        : const Color(0xFF64748B),
                                   ),
                                 ),
                                 if (isOfficial) ...[
                                   const SizedBox(width: 4),
-                                  const Icon(Icons.verified, size: 10, color: AppColors.primary),
+                                  const Icon(Icons.verified,
+                                      size: 10, color: AppColors.primary),
                                 ],
                               ],
                             ),
@@ -242,7 +303,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                           style: TextStyle(
                             color: isMe
                                 ? Colors.white
-                                : (isDark ? const Color(0xFFE2E8F0) : const Color(0xFF0F172A)),
+                                : (isDark
+                                    ? const Color(0xFFE2E8F0)
+                                    : const Color(0xFF0F172A)),
                             fontSize: 14,
                             height: 1.4,
                           ),
@@ -255,12 +318,15 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                               m['time'] as String,
                               style: TextStyle(
                                 fontSize: 10,
-                                color: isMe ? Colors.white70 : const Color(0xFF94A3B8),
+                                color: isMe
+                                    ? Colors.white70
+                                    : const Color(0xFF94A3B8),
                               ),
                             ),
                             if (isMe) ...[
                               const SizedBox(width: 4),
-                              const Icon(Icons.done_all, size: 12, color: Colors.white70),
+                              const Icon(Icons.done_all,
+                                  size: 12, color: Colors.white70),
                             ],
                           ],
                         ),
@@ -276,10 +342,16 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
             decoration: BoxDecoration(
               color: isDark ? AppColors.backgroundDark : Colors.white,
               border: Border(
-                top: BorderSide(color: isDark ? AppColors.borderDark : const Color(0xFFF1F5F9)),
+                top: BorderSide(
+                    color: isDark
+                        ? AppColors.borderDark
+                        : const Color(0xFFF1F5F9)),
               ),
               boxShadow: const [
-                BoxShadow(color: Color(0x08000000), blurRadius: 12, offset: Offset(0, -2)),
+                BoxShadow(
+                    color: Color(0x08000000),
+                    blurRadius: 12,
+                    offset: Offset(0, -2)),
               ],
             ),
             padding: EdgeInsets.fromLTRB(
@@ -292,10 +364,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 IconButton(
-                  icon: const Icon(Icons.add_circle_outline, size: 22, color: Color(0xFF94A3B8)),
-                  onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Вложения пока недоступны')),
-                  ),
+                  icon: const Icon(Icons.add_circle_outline,
+                      size: 22, color: Color(0xFF94A3B8)),
+                  onPressed: _pickAttachment,
                   visualDensity: VisualDensity.compact,
                 ),
                 Expanded(
@@ -306,14 +377,18 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                     textCapitalization: TextCapitalization.sentences,
                     decoration: InputDecoration(
                       hintText: 'Написать сообщение...',
-                      hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
+                      hintStyle: const TextStyle(
+                          color: Color(0xFF94A3B8), fontSize: 14),
                       filled: true,
-                      fillColor: isDark ? AppColors.secondaryDark : const Color(0xFFF1F5F9),
+                      fillColor: isDark
+                          ? AppColors.secondaryDark
+                          : const Color(0xFFF1F5F9),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(24),
                         borderSide: BorderSide.none,
                       ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 10),
                       isDense: true,
                     ),
                     style: TextStyle(
@@ -332,14 +407,17 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: hasText ? AppColors.primary : const Color(0xFFE2E8F0),
+                        color: hasText
+                            ? AppColors.primary
+                            : const Color(0xFFE2E8F0),
                         shape: BoxShape.circle,
                       ),
                       child: IconButton(
                         icon: Icon(
                           Icons.send,
                           size: 18,
-                          color: hasText ? Colors.white : const Color(0xFF94A3B8),
+                          color:
+                              hasText ? Colors.white : const Color(0xFF94A3B8),
                         ),
                         onPressed: hasText ? _send : null,
                       ),

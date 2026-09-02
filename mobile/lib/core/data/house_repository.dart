@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../supabase/supabase_config.dart';
@@ -14,7 +16,8 @@ class HouseRepository {
   }
 
   Future<AuthResponse> signIn(String email, String password) {
-    return _client.auth.signInWithPassword(email: email.trim().toLowerCase(), password: password);
+    return _client.auth.signInWithPassword(
+        email: email.trim().toLowerCase(), password: password);
   }
 
   Future<AuthResponse> signUp({
@@ -50,13 +53,15 @@ class HouseRepository {
     if (user == null) return null;
     final row = await _client
         .from('profiles')
-        .select('id, complex_id, full_name, phone, avatar_url, verified, bio, apartment:apartments(number, entrance:entrances(number, building:buildings(number)))')
+        .select(
+            'id, complex_id, full_name, phone, avatar_url, verified, bio, apartment:apartments(number, entrance:entrances(number, building:buildings(number)))')
         .eq('id', user.id)
         .maybeSingle();
     return row == null ? null : Map<String, dynamic>.from(row);
   }
 
-  Future<void> updateProfile({required String fullName, required String phone}) async {
+  Future<void> updateProfile(
+      {required String fullName, required String phone}) async {
     if (!isConfigured) return;
     final user = _client.auth.currentUser;
     if (user == null) throw Exception('Требуется авторизация');
@@ -67,15 +72,19 @@ class HouseRepository {
   }
 
   Future<String> _signedMediaUrl(String? path) async {
-    if (path == null || path.isEmpty || path.startsWith('http')) return path ?? '';
-    final result = await _client.storage.from('house-media').createSignedUrl(path, 3600);
+    if (path == null || path.isEmpty || path.startsWith('http')) {
+      return path ?? '';
+    }
+    final result =
+        await _client.storage.from('house-media').createSignedUrl(path, 3600);
     return result;
   }
 
   Future<List<Post>> loadPosts() async {
     final rows = await _client
         .from('posts')
-        .select('*, author:profiles(id, full_name, avatar_url, role, verified), attachments:post_attachments(*), poll:polls(*, options:poll_options(*)), initiative:initiatives(*), fundraiser:fundraisers(*)')
+        .select(
+            '*, author:profiles(id, full_name, avatar_url, role, verified), attachments:post_attachments(*), poll:polls(*, options:poll_options(*)), initiative:initiatives(*), fundraiser:fundraisers(*)')
         .order('created_at', ascending: false)
         .limit(50);
     final posts = <Post>[];
@@ -99,7 +108,13 @@ class HouseRepository {
         .select('*')
         .order('last_message_at', ascending: false, nullsFirst: false)
         .limit(100);
-    return rows.map((row) => Map<String, dynamic>.from(row)).toList();
+    return Future.wait(rows.map((row) async {
+      final item = Map<String, dynamic>.from(row);
+      if (item['type'] == 'image' || item['type'] == 'document') {
+        item['content'] = await _signedMediaUrl(item['content'] as String?);
+      }
+      return item;
+    }));
   }
 
   Future<List<Map<String, dynamic>>> loadMessages(String chatId) async {
@@ -120,7 +135,9 @@ class HouseRepository {
         .limit(50);
     return Future.wait(rows.map((row) async {
       final item = Map<String, dynamic>.from(row);
-      final author = item['author'] is Map ? Map<String, dynamic>.from(item['author']) : <String, dynamic>{};
+      final author = item['author'] is Map
+          ? Map<String, dynamic>.from(item['author'])
+          : <String, dynamic>{};
       final price = item['price'];
       item['price_label'] = price == null
           ? 'Договорная'
@@ -153,6 +170,46 @@ class HouseRepository {
     });
   }
 
+  Future<void> sendAttachment({
+    required String chatId,
+    required String fileName,
+    required List<int> bytes,
+    required String mimeType,
+  }) async {
+    final user = _client.auth.currentUser;
+    if (user == null) throw Exception('Требуется авторизация');
+    final safeName = fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+    final path =
+        '${user.id}/chats/$chatId/${DateTime.now().millisecondsSinceEpoch}_$safeName';
+    await _client.storage
+        .from('house-media')
+        .uploadBinary(path, Uint8List.fromList(bytes));
+    await _client.from('messages').insert({
+      'chat_id': chatId,
+      'sender_id': user.id,
+      'content': path,
+      'type': mimeType.startsWith('image/') ? 'image' : 'document',
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> loadNotifications() async {
+    final user = _client.auth.currentUser;
+    if (user == null) throw Exception('Требуется авторизация');
+    final rows = await _client
+        .from('notifications')
+        .select('id, type, title, body, is_read, created_at')
+        .eq('user_id', user.id)
+        .order('created_at', ascending: false)
+        .limit(50);
+    return rows.map((row) => Map<String, dynamic>.from(row)).toList();
+  }
+
+  Future<void> markNotificationRead(String notificationId) async {
+    await _client
+        .from('notifications')
+        .update({'is_read': true}).eq('id', notificationId);
+  }
+
   Future<void> createClassified({
     required String title,
     required String category,
@@ -170,7 +227,9 @@ class HouseRepository {
       'title': title.trim(),
       'category': category,
       'description': description.trim(),
-      'price': price == null || price.trim().isEmpty ? null : num.tryParse(price.trim()),
+      'price': price == null || price.trim().isEmpty
+          ? null
+          : num.tryParse(price.trim()),
       'currency': 'KZT',
     });
   }

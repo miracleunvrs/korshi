@@ -23,18 +23,27 @@ class _FeedScreenState extends State<FeedScreen> {
   bool hasError = false;
   bool isOffline = false;
   List<Post> posts = <Post>[];
+  List<Map<String, dynamic>> notifications = <Map<String, dynamic>>[];
   final HouseRepository repository = HouseRepository();
   final Set<String> votedPollIds = <String>{};
   final Set<String> supportedInitiativeIds = <String>{};
   RealtimeChannel? _syncChannel;
 
-  final chips = const ['Весь ЖК', 'Мой дом', 'Мой подъезд', 'Официальное', 'Объявления', 'Опросы'];
+  final chips = const [
+    'Весь ЖК',
+    'Мой дом',
+    'Мой подъезд',
+    'Официальное',
+    'Объявления',
+    'Опросы'
+  ];
 
   @override
   void initState() {
     super.initState();
     if (repository.isConfigured) {
       _loadRemotePosts();
+      _loadNotifications();
       _syncChannel = Supabase.instance.client
           .channel('housesm-mobile-feed-sync')
           .onPostgresChanges(
@@ -49,13 +58,21 @@ class _FeedScreenState extends State<FeedScreen> {
             table: 'poll_votes',
             callback: (_) => _loadRemotePosts(),
           )
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'notifications',
+            callback: (_) => _loadNotifications(),
+          )
           .subscribe();
     }
   }
 
   @override
   void dispose() {
-    if (_syncChannel != null) Supabase.instance.client.removeChannel(_syncChannel!);
+    if (_syncChannel != null) {
+      Supabase.instance.client.removeChannel(_syncChannel!);
+    }
     super.dispose();
   }
 
@@ -83,6 +100,58 @@ class _FeedScreenState extends State<FeedScreen> {
     }
   }
 
+  Future<void> _loadNotifications() async {
+    try {
+      final rows = await repository.loadNotifications();
+      if (mounted) setState(() => notifications = rows);
+    } catch (_) {
+      // Ошибка уведомлений не должна блокировать ленту.
+    }
+  }
+
+  Future<void> _openNotifications() async {
+    await _loadNotifications();
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) => SizedBox(
+        height: MediaQuery.of(sheetContext).size.height * 0.65,
+        child: notifications.isEmpty
+            ? const Center(child: Text('Пока уведомлений нет'))
+            : ListView.separated(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                itemCount: notifications.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (_, index) {
+                  final notification = notifications[index];
+                  final isRead = notification['is_read'] == true;
+                  return ListTile(
+                    tileColor: isRead ? null : const Color(0xFFEFFAF2),
+                    title: Text('${notification['title'] ?? 'Уведомление'}',
+                        style: const TextStyle(fontWeight: FontWeight.w700)),
+                    subtitle: Text('${notification['body'] ?? ''}'),
+                    trailing: Text(
+                        '${notification['created_at']}'.substring(0, 10),
+                        style: const TextStyle(
+                            fontSize: 10, color: Color(0xFF94A3B8))),
+                    onTap: () async {
+                      if (!isRead) {
+                        await repository
+                            .markNotificationRead('${notification['id']}');
+                        if (mounted) {
+                          setState(() => notification['is_read'] = true);
+                        }
+                      }
+                    },
+                  );
+                },
+              ),
+      ),
+    );
+  }
+
   List<Post> get filteredPosts {
     return posts.where((post) {
       if (activeChip == 'Мой дом' &&
@@ -90,7 +159,9 @@ class _FeedScreenState extends State<FeedScreen> {
           post.territory != Territory.complex) {
         return false;
       }
-      if (activeChip == 'Мой подъезд' && post.territory != Territory.entrance) return false;
+      if (activeChip == 'Мой подъезд' && post.territory != Territory.entrance) {
+        return false;
+      }
       if (activeChip == 'Официальное' && !post.isOfficial) return false;
       if (activeChip == 'Объявления' &&
           post.type != PostType.announcement &&
@@ -102,11 +173,18 @@ class _FeedScreenState extends State<FeedScreen> {
           post.type != PostType.officialPoll) {
         return false;
       }
-      if (selectedTerritory == 'building' && post.territory != Territory.building) return false;
-      if (selectedTerritory == 'entrance' && post.territory != Territory.entrance) return false;
+      if (selectedTerritory == 'building' &&
+          post.territory != Territory.building) return false;
+      if (selectedTerritory == 'entrance' &&
+          post.territory != Territory.entrance) return false;
       if (selectedType == 'post' && post.type != PostType.post) return false;
-      if (selectedType == 'announcement' && post.type != PostType.announcement) return false;
-      if (selectedType == 'service' && post.type != PostType.service) return false;
+      if (selectedType == 'announcement' &&
+          post.type != PostType.announcement) {
+        return false;
+      }
+      if (selectedType == 'service' && post.type != PostType.service) {
+        return false;
+      }
       if (selectedType == 'poll_initiative' &&
           post.type != PostType.poll &&
           post.type != PostType.officialPoll &&
@@ -166,11 +244,15 @@ class _FeedScreenState extends State<FeedScreen> {
                 color: isDark ? AppColors.backgroundDark : Colors.white,
                 border: Border(
                   bottom: BorderSide(
-                    color: isDark ? AppColors.borderDark : const Color(0xFFF1F5F9),
+                    color:
+                        isDark ? AppColors.borderDark : const Color(0xFFF1F5F9),
                   ),
                 ),
                 boxShadow: const [
-                  BoxShadow(color: Color(0x05000000), blurRadius: 8, offset: Offset(0, 2)),
+                  BoxShadow(
+                      color: Color(0x05000000),
+                      blurRadius: 8,
+                      offset: Offset(0, 2)),
                 ],
               ),
               child: Column(
@@ -220,13 +302,15 @@ class _FeedScreenState extends State<FeedScreen> {
                                     ),
                                   ),
                                   SizedBox(width: 6),
-                                  Icon(Icons.verified, size: 14, color: AppColors.primary),
+                                  Icon(Icons.verified,
+                                      size: 14, color: AppColors.primary),
                                 ],
                               ),
                               SizedBox(height: 2),
                               Text(
                                 'Алматы, 2 дома • 120 квартир',
-                                style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                                style: TextStyle(
+                                    fontSize: 11, color: Color(0xFF94A3B8)),
                               ),
                             ],
                           ),
@@ -237,8 +321,9 @@ class _FeedScreenState extends State<FeedScreen> {
                               onPressed: _openFilter,
                               icon: const Icon(Icons.tune, size: 20),
                               style: IconButton.styleFrom(
-                                backgroundColor:
-                                    isDark ? AppColors.secondaryDark : const Color(0xFFF1F5F9),
+                                backgroundColor: isDark
+                                    ? AppColors.secondaryDark
+                                    : const Color(0xFFF1F5F9),
                                 foregroundColor: const Color(0xFF64748B),
                               ),
                             ),
@@ -252,7 +337,8 @@ class _FeedScreenState extends State<FeedScreen> {
                                   decoration: BoxDecoration(
                                     color: AppColors.primary,
                                     shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.white, width: 1.5),
+                                    border: Border.all(
+                                        color: Colors.white, width: 1.5),
                                   ),
                                 ),
                               ),
@@ -260,13 +346,12 @@ class _FeedScreenState extends State<FeedScreen> {
                         ),
                         const SizedBox(width: 6),
                         IconButton(
-                          onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Уведомления пока пусты')),
-                          ),
+                          onPressed: _openNotifications,
                           icon: const Icon(Icons.notifications_none, size: 20),
                           style: IconButton.styleFrom(
-                            backgroundColor:
-                                isDark ? AppColors.secondaryDark : const Color(0xFFF1F5F9),
+                            backgroundColor: isDark
+                                ? AppColors.secondaryDark
+                                : const Color(0xFFF1F5F9),
                             foregroundColor: const Color(0xFF64748B),
                           ),
                         ),
@@ -291,13 +376,16 @@ class _FeedScreenState extends State<FeedScreen> {
                       onRetry: () => setState(() => hasError = false),
                     )
                   : isLoading
-                      ? ListView.builder(itemCount: 4, itemBuilder: (_, __) => const PostSkeleton())
+                      ? ListView.builder(
+                          itemCount: 4,
+                          itemBuilder: (_, __) => const PostSkeleton())
                       : filtered.isEmpty
                           ? SingleChildScrollView(
                               child: EmptyState(
                                 icon: Icons.feed_outlined,
                                 title: 'Нет публикаций по выбранным фильтрам',
-                                subtitle: 'Попробуйте изменить территорию или тип публикаций',
+                                subtitle:
+                                    'Попробуйте изменить территорию или тип публикаций',
                                 actionLabel: 'Сбросить фильтры',
                                 onAction: () => setState(() {
                                   selectedTerritory = 'all';
@@ -311,7 +399,9 @@ class _FeedScreenState extends State<FeedScreen> {
                               color: AppColors.primary,
                               child: ListView.builder(
                                 padding: EdgeInsets.only(
-                                  bottom: MediaQuery.of(context).padding.bottom + 80,
+                                  bottom:
+                                      MediaQuery.of(context).padding.bottom +
+                                          80,
                                 ),
                                 itemCount: filtered.length,
                                 itemBuilder: (context, i) {
@@ -322,44 +412,64 @@ class _FeedScreenState extends State<FeedScreen> {
                                       setState(() {
                                         post.reactionsCount = liked
                                             ? post.reactionsCount + 1
-                                            : (post.reactionsCount > 0 ? post.reactionsCount - 1 : 0);
+                                            : (post.reactionsCount > 0
+                                                ? post.reactionsCount - 1
+                                                : 0);
                                       });
                                     },
                                     // Дополнительная защита от повторных нажатий после перестроения.
                                     onVote: (pollId, optionId) async {
                                       if (votedPollIds.contains(pollId)) return;
                                       votedPollIds.add(pollId);
-                                      final messenger = ScaffoldMessenger.of(context);
+                                      final messenger =
+                                          ScaffoldMessenger.of(context);
                                       try {
                                         if (repository.isConfigured) {
-                                          final user = await repository.currentUser();
-                                          if (user == null) throw Exception('Требуется авторизация');
-                                          await repository.vote(pollId, optionId);
+                                          final user =
+                                              await repository.currentUser();
+                                          if (user == null) {
+                                            throw Exception(
+                                                'Требуется авторизация');
+                                          }
+                                          await repository.vote(
+                                              pollId, optionId);
                                         }
                                         if (!mounted) return;
                                         setState(() {
-                                          final opt = post.poll!.options.firstWhere((o) => o.id == optionId);
+                                          final opt = post.poll!.options
+                                              .firstWhere(
+                                                  (o) => o.id == optionId);
                                           opt.votesCount++;
                                           post.poll!.totalVotes++;
                                         });
                                         messenger.showSnackBar(
-                                          const SnackBar(content: Text('Голос учтён'), duration: Duration(seconds: 1)),
+                                          const SnackBar(
+                                              content: Text('Голос учтён'),
+                                              duration: Duration(seconds: 1)),
                                         );
                                       } catch (_) {
                                         votedPollIds.remove(pollId);
                                         if (mounted) {
                                           messenger.showSnackBar(
-                                            const SnackBar(content: Text('Не удалось сохранить голос')),
+                                            const SnackBar(
+                                                content: Text(
+                                                    'Не удалось сохранить голос')),
                                           );
                                         }
                                       }
                                     },
                                     onSupportInitiative: (id) {
-                                      if (supportedInitiativeIds.contains(id)) return;
+                                      if (supportedInitiativeIds.contains(id)) {
+                                        return;
+                                      }
                                       supportedInitiativeIds.add(id);
-                                      setState(() => post.initiative!.supporters++);
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Спасибо за поддержку!')),
+                                      setState(
+                                          () => post.initiative!.supporters++);
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                            content:
+                                                Text('Спасибо за поддержку!')),
                                       );
                                     },
                                   );
@@ -422,7 +532,8 @@ class _FilterSheet extends StatelessWidget {
                     children: [
                       IconButton(
                         onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.close, size: 20, color: Color(0xFFA1A1AA)),
+                        icon: const Icon(Icons.close,
+                            size: 20, color: Color(0xFFA1A1AA)),
                       ),
                       const SizedBox(width: 8),
                       const Text(
@@ -474,9 +585,11 @@ class _FilterSheet extends StatelessWidget {
                     onTap: () => onSelectTerritory(t['id']!),
                     borderRadius: BorderRadius.circular(16),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 14),
                       decoration: BoxDecoration(
-                        color: sel ? const Color(0xFF27272A) : Colors.transparent,
+                        color:
+                            sel ? const Color(0xFF27272A) : Colors.transparent,
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Row(
@@ -485,9 +598,11 @@ class _FilterSheet extends StatelessWidget {
                           Text(
                             t['label']!,
                             style: TextStyle(
-                              color: sel ? Colors.white : const Color(0xFFA1A1AA),
+                              color:
+                                  sel ? Colors.white : const Color(0xFFA1A1AA),
                               fontSize: 14,
-                              fontWeight: sel ? FontWeight.w600 : FontWeight.w400,
+                              fontWeight:
+                                  sel ? FontWeight.w600 : FontWeight.w400,
                             ),
                           ),
                           if (sel)
@@ -498,7 +613,8 @@ class _FilterSheet extends StatelessWidget {
                                 color: AppColors.primary,
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.check, size: 12, color: Colors.white),
+                              child: const Icon(Icons.check,
+                                  size: 12, color: Colors.white),
                             ),
                         ],
                       ),
@@ -532,9 +648,11 @@ class _FilterSheet extends StatelessWidget {
                     onTap: () => onSelectType(t['id']!),
                     borderRadius: BorderRadius.circular(16),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 14),
                       decoration: BoxDecoration(
-                        color: sel ? const Color(0xFF27272A) : Colors.transparent,
+                        color:
+                            sel ? const Color(0xFF27272A) : Colors.transparent,
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Row(
@@ -543,9 +661,11 @@ class _FilterSheet extends StatelessWidget {
                           Text(
                             t['label']!,
                             style: TextStyle(
-                              color: sel ? Colors.white : const Color(0xFFA1A1AA),
+                              color:
+                                  sel ? Colors.white : const Color(0xFFA1A1AA),
                               fontSize: 14,
-                              fontWeight: sel ? FontWeight.w600 : FontWeight.w400,
+                              fontWeight:
+                                  sel ? FontWeight.w600 : FontWeight.w400,
                             ),
                           ),
                           if (sel)
@@ -556,7 +676,8 @@ class _FilterSheet extends StatelessWidget {
                                 color: AppColors.primary,
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.check, size: 12, color: Colors.white),
+                              child: const Icon(Icons.check,
+                                  size: 12, color: Colors.white),
                             ),
                         ],
                       ),
@@ -572,11 +693,13 @@ class _FilterSheet extends StatelessWidget {
                   style: FilledButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
                   ),
                   child: const Text(
                     'Показать результаты',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                    style: TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.w700),
                   ),
                 ),
               ),
