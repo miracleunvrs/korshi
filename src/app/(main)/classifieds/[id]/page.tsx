@@ -11,21 +11,39 @@ import {
   MapPin, 
   Share2, 
   Building2,
-  Clock
+  Clock,
+  Trash2
 } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 
 export default function ClassifiedDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const router = useRouter();
-  const { classifieds, createDirectChatWith } = useAppStore();
+  const { classifieds, createDirectChatWith, deleteClassified, currentUser } = useAppStore();
 
-  const item = classifieds.find((c) => c.id === resolvedParams.id) || classifieds[0];
+  const item = classifieds.find((c) => c.id === resolvedParams.id);
 
-  const handleStartChat = () => {
-    const chatId = createDirectChatWith(item.authorName);
+  const handleStartChat = async () => {
+    if (!item) return;
+    const chatId = await createDirectChatWith(item.authorId, item.authorName);
     router.push(`/chats/${chatId}`);
   };
+
+  const isOwner = item?.authorId === currentUser.id;
+  const handleRemove = () => {
+    if (!item || !isOwner || !window.confirm("Снять объявление? Оно исчезнет из списка.")) return;
+    deleteClassified(item.id);
+    router.push("/classifieds");
+  };
+
+  if (!item) {
+    return (
+      <div className="min-h-screen bg-white p-6 flex flex-col items-center justify-center text-center gap-4">
+        <p className="text-sm font-semibold text-gray-600">Объявление не найдено</p>
+        <Link href="/classifieds" className="text-sm font-bold text-green-700">Вернуться к объявлениям</Link>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white pb-24">
@@ -35,9 +53,16 @@ export default function ClassifiedDetailPage({ params }: { params: Promise<{ id:
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <h1 className="font-bold text-gray-900 text-sm truncate max-w-[200px]">{item.title}</h1>
-        <button className="text-gray-400 p-1 hover:text-gray-600">
-          <Share2 className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button className="text-gray-400 p-1 hover:text-gray-600" aria-label="Поделиться">
+            <Share2 className="w-4 h-4" />
+          </button>
+          {isOwner && (
+            <button onClick={handleRemove} className="text-gray-400 p-1 hover:text-red-600" aria-label="Снять объявление">
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="p-6 space-y-6">
@@ -100,7 +125,8 @@ export default function ClassifiedDetailPage({ params }: { params: Promise<{ id:
 
         <button
           onClick={handleStartChat}
-          className="flex-1 py-3.5 bg-green-600 hover:bg-green-700 active:scale-95 text-white font-bold text-xs rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-green-600/30 transition"
+          disabled={item.authorId === currentUser.id}
+          className="flex-1 py-3.5 bg-green-600 hover:bg-green-700 active:scale-95 text-white font-bold text-xs rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-green-600/30 transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <MessageSquare className="w-4 h-4" />
           <span>Написать в чат</span>

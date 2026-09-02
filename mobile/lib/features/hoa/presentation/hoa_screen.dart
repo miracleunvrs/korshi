@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radius.dart';
+import '../../../core/data/house_repository.dart';
+import '../../feed/models/post.dart';
 
 class HoaScreen extends StatefulWidget {
   const HoaScreen({super.key});
@@ -10,7 +12,11 @@ class HoaScreen extends StatefulWidget {
 }
 
 class _HoaScreenState extends State<HoaScreen> {
+  final repository = HouseRepository();
+  List<Post> remotePosts = [];
+  bool loaded = false;
   String activeTab = 'Новости';
+  final Set<String> votedPollIds = <String>{};
   final categories = [
     {'label': 'Новости', 'icon': Icons.newspaper_outlined},
     {'label': 'Документы', 'icon': Icons.description_outlined},
@@ -20,8 +26,28 @@ class _HoaScreenState extends State<HoaScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _loadRemote();
+  }
+
+  Future<void> _loadRemote() async {
+    if (!repository.isConfigured) return;
+    try {
+      final posts = await repository.loadPosts();
+      if (mounted) setState(() => remotePosts = posts.where((p) => p.isOfficial || p.type == PostType.fundraiser || p.type == PostType.officialPoll).toList());
+    } finally {
+      if (mounted) setState(() => loaded = true);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    if (repository.isConfigured) {
+      if (!loaded) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return _buildRemote(context, isDark);
+    }
     return Scaffold(
       backgroundColor: isDark ? AppColors.bgDark : const Color(0xFFF8FAFC),
       body: SafeArea(
@@ -263,7 +289,9 @@ class _HoaScreenState extends State<HoaScreen> {
                         SizedBox(
                           width: double.infinity,
                           child: FilledButton(
-                            onPressed: () {},
+                            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Опрос доступен после загрузки данных ЖК')),
+                            ),
                             style: FilledButton.styleFrom(
                               backgroundColor: AppColors.primary,
                               shape: RoundedRectangleBorder(
@@ -358,6 +386,69 @@ class _HoaScreenState extends State<HoaScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildRemote(BuildContext context, bool isDark) {
+    return Scaffold(
+      backgroundColor: isDark ? AppColors.bgDark : const Color(0xFFF8FAFC),
+      appBar: AppBar(title: const Text('Мой ЖК')),
+      body: remotePosts.isEmpty
+          ? const Center(child: Text('Официальных публикаций пока нет'))
+          : ListView.separated(
+              padding: const EdgeInsets.all(16),
+              itemCount: remotePosts.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (_, index) {
+                final post = remotePosts[index];
+                return Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(post.title ?? post.type.label, style: const TextStyle(fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 8),
+                      Text(post.content),
+                      if (post.poll != null) ...[
+                        const SizedBox(height: 12),
+                        ...post.poll!.options.map((option) => ListTile(
+                              dense: true,
+                              title: Text(option.text),
+                              onTap: votedPollIds.contains(post.poll!.id)
+                                  ? null
+                                  : () async {
+                                      final messenger = ScaffoldMessenger.of(context);
+                                      final user = await repository.currentUser();
+                                      if (user == null) return;
+                                      try {
+                                        await repository.vote(post.poll!.id, option.id);
+                                        if (!mounted) return;
+                                        setState(() {
+                                          votedPollIds.add(post.poll!.id);
+                                          option.votesCount++;
+                                          post.poll!.totalVotes++;
+                                        });
+                                      } catch (_) {
+                                        if (mounted) {
+                                          messenger.showSnackBar(
+                                            const SnackBar(content: Text('Не удалось сохранить голос')),
+                                          );
+                                        }
+                                      }
+                                    },
+                              trailing: Text('${option.votesCount}'),
+                            )),
+                      ],
+                      if (post.fundraiser != null) ...[
+                        const SizedBox(height: 8),
+                        LinearProgressIndicator(value: post.fundraiser!.progress),
+                        const SizedBox(height: 6),
+                        Text('${post.fundraiser!.currentAmount} / ${post.fundraiser!.targetAmount} ${post.fundraiser!.currency}'),
+                      ],
+                    ]),
+                  ),
+                );
+              },
+            ),
     );
   }
 }

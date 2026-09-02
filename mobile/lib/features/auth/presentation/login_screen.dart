@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/data/house_repository.dart';
 import '../../../core/theme/app_colors.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -11,10 +12,14 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
   late TabController _tab;
-  final _loginPhone = TextEditingController(text: '+7 (777) ');
+  final _loginEmail = TextEditingController();
+  final _loginPassword = TextEditingController();
   final _regName = TextEditingController();
   final _regPhone = TextEditingController(text: '+7 (777) ');
+  final _regEmail = TextEditingController();
+  final _regPassword = TextEditingController();
   final _regApartment = TextEditingController();
+  final _repository = HouseRepository();
   String _regBuilding = '1';
   int _regEntrance = 1;
   String _regRole = 'resident';
@@ -22,17 +27,67 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
-    _tab = TabController(length: 3, vsync: this, initialIndex: 0);
+    _tab = TabController(length: 2, vsync: this, initialIndex: 0);
   }
 
   @override
   void dispose() {
     _tab.dispose();
-    _loginPhone.dispose();
+    _loginEmail.dispose();
+    _loginPassword.dispose();
     _regName.dispose();
     _regPhone.dispose();
+    _regEmail.dispose();
+    _regPassword.dispose();
     _regApartment.dispose();
     super.dispose();
+  }
+
+  Future<void> _login() async {
+    if (!_repository.isConfigured) {
+      if (mounted) context.go('/feed');
+      return;
+    }
+    try {
+      await _repository.signIn(_loginEmail.text, _loginPassword.text);
+      if (mounted) context.go('/feed');
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Не удалось войти: $error')));
+      }
+    }
+  }
+
+  Future<void> _register() async {
+    if (!_repository.isConfigured) {
+      if (mounted) context.go('/feed');
+      return;
+    }
+    try {
+      final response = await _repository.signUp(
+        email: _regEmail.text,
+        password: _regPassword.text,
+        fullName: _regName.text,
+        phone: _regPhone.text,
+        buildingNumber: _regBuilding,
+        entranceNumber: _regEntrance,
+        apartmentNumber: _regApartment.text,
+      );
+      if (!mounted) return;
+      if (response.session == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Проверьте email и подтвердите регистрацию')),
+        );
+      } else {
+        context.go('/feed');
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Не удалось зарегистрироваться: $error')),
+        );
+      }
+    }
   }
 
   @override
@@ -142,9 +197,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                       indicatorSize: TabBarIndicatorSize.tab,
                       dividerColor: Colors.transparent,
                       tabs: const [
-                        Tab(text: 'Быстрый вход'),
                         Tab(text: 'Регистрация'),
-                        Tab(text: 'Вход по номеру'),
+                        Tab(text: 'Вход'),
                       ],
                     ),
                   ),
@@ -154,10 +208,11 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                     child: TabBarView(
                       controller: _tab,
                       children: [
-                        _DemoTab(onSelect: () => context.go('/feed')),
                         _RegisterTab(
                           nameCtrl: _regName,
                           phoneCtrl: _regPhone,
+                          emailCtrl: _regEmail,
+                          passwordCtrl: _regPassword,
                           apartmentCtrl: _regApartment,
                           building: _regBuilding,
                           entrance: _regEntrance,
@@ -165,9 +220,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                           onBuildingChanged: (v) => setState(() => _regBuilding = v),
                           onEntranceChanged: (v) => setState(() => _regEntrance = v),
                           onRoleChanged: (v) => setState(() => _regRole = v),
-                          onSubmit: () => context.go('/feed'),
+                          onSubmit: _register,
                         ),
-                        _LoginTab(phoneCtrl: _loginPhone, onSubmit: () => context.go('/feed')),
+                        _LoginTab(emailCtrl: _loginEmail, passwordCtrl: _loginPassword, onSubmit: _login),
                       ],
                     ),
                   ),
@@ -181,149 +236,20 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   }
 }
 
-class _DemoTab extends StatelessWidget {
-  final VoidCallback onSelect;
-  const _DemoTab({required this.onSelect});
-  @override
-  Widget build(BuildContext context) {
-    final demos = [
-      {
-        'name': 'Мария Иванова',
-        'role': 'Житель',
-        'phone': '+7 (777) 234-56-78',
-        'verified': true,
-        'avatar':
-            'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
-      },
-      {
-        'name': 'Алексей Петров',
-        'role': 'Житель',
-        'phone': '+7 (777) 111-22-33',
-        'verified': true,
-        'avatar':
-            'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80',
-      },
-      {
-        'name': 'ОСИ «Солнечный»',
-        'role': 'ОСИ',
-        'phone': '+7 (777) 000-00-00',
-        'verified': true,
-        'avatar': '',
-      },
-      {
-        'name': 'ИП Сантехник',
-        'role': 'Мастер услуг',
-        'phone': '+7 (777) 555-66-77',
-        'verified': false,
-        'avatar':
-            'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=200&auto=format&fit=crop&q=80',
-      },
-    ];
-    return Column(
-      children: [
-        const Text(
-          'Выберите роль для мгновенного входа:',
-          style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
-        ),
-        const SizedBox(height: 12),
-        Expanded(
-          child: ListView.separated(
-            itemCount: demos.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemBuilder: (context, i) {
-              final d = demos[i];
-              return InkWell(
-                onTap: onSelect,
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: d['avatar']!.toString().isNotEmpty
-                            ? Image.network(
-                                d['avatar'] as String,
-                                width: 40,
-                                height: 40,
-                                fit: BoxFit.cover,
-                              )
-                            : Container(
-                                width: 40,
-                                height: 40,
-                                color: AppColors.primaryLight,
-                                child: const Icon(Icons.apartment, color: AppColors.primary),
-                              ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Text(
-                                  d['name'] as String,
-                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                                ),
-                                if (d['verified'] as bool)
-                                  const Padding(
-                                    padding: EdgeInsets.only(left: 4),
-                                    child: Icon(Icons.verified, size: 12, color: AppColors.primary),
-                                  ),
-                              ],
-                            ),
-                            Text(
-                              d['role'] as String,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF15803D),
-                              ),
-                            ),
-                            Text(
-                              d['phone'] as String,
-                              style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Text(
-                        'Войти →',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF64748B),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _RegisterTab extends StatelessWidget {
-  final TextEditingController nameCtrl, phoneCtrl, apartmentCtrl;
+  final TextEditingController nameCtrl, phoneCtrl, emailCtrl, passwordCtrl, apartmentCtrl;
   final String building;
   final int entrance;
   final String role;
   final ValueChanged<String> onBuildingChanged;
   final ValueChanged<int> onEntranceChanged;
   final ValueChanged<String> onRoleChanged;
-  final VoidCallback onSubmit;
+  final Future<void> Function() onSubmit;
   const _RegisterTab({
     required this.nameCtrl,
     required this.phoneCtrl,
+    required this.emailCtrl,
+    required this.passwordCtrl,
     required this.apartmentCtrl,
     required this.building,
     required this.entrance,
@@ -345,6 +271,20 @@ class _RegisterTab extends StatelessWidget {
             hint: '+7 (777) 123-45-67',
             controller: phoneCtrl,
             keyboardType: TextInputType.phone,
+          ),
+          const SizedBox(height: 12),
+          _Field(
+            label: 'Email',
+            hint: 'you@example.com',
+            controller: emailCtrl,
+            keyboardType: TextInputType.emailAddress,
+          ),
+          const SizedBox(height: 12),
+          _Field(
+            label: 'Пароль',
+            hint: 'Минимум 6 символов',
+            controller: passwordCtrl,
+            obscureText: true,
           ),
           const SizedBox(height: 12),
           Row(
@@ -460,23 +400,30 @@ class _RegisterTab extends StatelessWidget {
 }
 
 class _LoginTab extends StatelessWidget {
-  final TextEditingController phoneCtrl;
-  final VoidCallback onSubmit;
-  const _LoginTab({required this.phoneCtrl, required this.onSubmit});
+  final TextEditingController emailCtrl, passwordCtrl;
+  final Future<void> Function() onSubmit;
+  const _LoginTab({required this.emailCtrl, required this.passwordCtrl, required this.onSubmit});
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
         _Field(
-          label: 'Номер мобильного телефона',
-          hint: '+7 (777) 123-45-67',
-          controller: phoneCtrl,
-          keyboardType: TextInputType.phone,
+          label: 'Email',
+          hint: 'you@example.com',
+          controller: emailCtrl,
+          keyboardType: TextInputType.emailAddress,
         ),
         const SizedBox(height: 6),
         const Text(
-          'Введите номер зарегистрированного жителя или любой новый для мгновенного входа.',
+          'Введите email и пароль зарегистрированного жителя.',
           style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+        ),
+        const SizedBox(height: 12),
+        _Field(
+          label: 'Пароль',
+          hint: 'Ваш пароль',
+          controller: passwordCtrl,
+          obscureText: true,
         ),
         const Spacer(),
         SizedBox(
@@ -505,11 +452,13 @@ class _Field extends StatelessWidget {
   final String label, hint;
   final TextEditingController controller;
   final TextInputType? keyboardType;
+  final bool obscureText;
   const _Field({
     required this.label,
     required this.hint,
     required this.controller,
     this.keyboardType,
+    this.obscureText = false,
   });
   @override
   Widget build(BuildContext context) {
@@ -528,6 +477,7 @@ class _Field extends StatelessWidget {
         TextField(
           controller: controller,
           keyboardType: keyboardType,
+          obscureText: obscureText,
           decoration: InputDecoration(
             hintText: hint,
             filled: true,

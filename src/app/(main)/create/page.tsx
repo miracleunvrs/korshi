@@ -17,6 +17,8 @@ import {
 import type { PostType, TerritoryType } from "@/types/domain";
 import type { PostWithAuthor } from "@/types";
 import { useAppStore } from "@/stores/appStore";
+import { createClient } from "@/lib/supabase/client";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 export default function CreatePostPage() {
   const router = useRouter();
@@ -29,6 +31,8 @@ export default function CreatePostPage() {
   const [price, setPrice] = useState("");
   const [pollOptions, setPollOptions] = useState<string[]>(["", ""]);
   const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
 
   const postTypes: { id: PostType; label: string; icon: typeof FileText; desc: string }[] = [
     { id: "post", label: "Публикация", icon: FileText, desc: "Обычный пост, новость или вопрос соседям" },
@@ -52,21 +56,43 @@ export default function CreatePostPage() {
     setPollOptions(next);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!content.trim()) return;
+    if (!currentUser.verified) {
+      setFormError("Сначала подтвердите статус жителя, чтобы публиковать записи.");
+      return;
+    }
+    setFormError("");
 
     setLoading(true);
+
+    let imagePath = "";
+    try {
+      if (imageFile && isSupabaseConfigured()) {
+        imagePath = `${currentUser.id}/posts/${crypto.randomUUID()}-${imageFile.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+        const { error } = await createClient().storage.from("house-media").upload(imagePath, imageFile, {
+          contentType: imageFile.type || "application/octet-stream",
+          upsert: false,
+        });
+        if (error) throw error;
+      }
 
     const newPostId = `post-${Date.now()}`;
     const validOptions = pollOptions.filter((o) => o.trim().length > 0);
 
+    if (type === 'poll' && validOptions.length < 2) {
+      setFormError('Добавьте минимум 2 варианта ответа для опроса.');
+      setLoading(false);
+      return;
+    }
+
     const newPost: PostWithAuthor = {
       id: newPostId,
       author_id: currentUser.id,
-      complex_id: "complex-1",
-      building_id: territory === "building" ? "building-1" : null,
-      entrance_id: territory === "entrance" ? "entrance-1" : null,
+      complex_id: currentUser.complexId || "complex-1",
+      building_id: territory === "building" || territory === "entrance" ? (currentUser.buildingId || `building-${currentUser.buildingNumber}`) : null,
+      entrance_id: territory === "entrance" ? (currentUser.entranceId || `entrance-${currentUser.entranceNumber}`) : null,
       type,
       title: title.trim() ? title.trim() : null,
       content: content.trim(),
@@ -87,6 +113,17 @@ export default function CreatePostPage() {
       },
       reactions_count: 0,
       comments_count: 0,
+      attachments: imagePath
+        ? [{
+            id: crypto.randomUUID(),
+            post_id: newPostId,
+            url: imagePath,
+            type: "image",
+            name: imageFile?.name || null,
+            size: imageFile?.size || null,
+            created_at: new Date().toISOString(),
+          }]
+        : [],
       poll:
         type === "poll" && validOptions.length >= 2
           ? {
@@ -133,7 +170,11 @@ export default function CreatePostPage() {
         createdAt: "Только что",
       });
     }
-    router.push("/feed");
+      router.push("/feed");
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "Не удалось сохранить публикацию");
+      setLoading(false);
+    }
   };
 
   return (
@@ -146,7 +187,7 @@ export default function CreatePostPage() {
         <h1 className="font-bold text-gray-900 text-sm">Новая публикация</h1>
         <button
           onClick={handleSubmit}
-          disabled={loading || !content.trim()}
+          disabled={loading || !content.trim() || !currentUser.verified}
           className="text-xs font-bold bg-green-600 hover:bg-green-700 text-white px-3.5 py-1.5 rounded-full disabled:opacity-40 shadow-xs transition"
         >
           {loading ? "Публикация..." : "Опубликовать"}
@@ -154,6 +195,16 @@ export default function CreatePostPage() {
       </div>
 
       <div className="p-4 space-y-6">
+        {!currentUser.verified && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-800">
+            <p className="font-bold">Публикации доступны подтверждённым жителям</p>
+            <p className="mt-1">Подтвердите статус, чтобы писать в ленту и размещать объявления.</p>
+            <Link href="/verify-resident" className="mt-2 inline-block font-bold text-amber-900 underline">
+              Перейти к подтверждению
+            </Link>
+          </div>
+        )}
+        {formError && <p className="rounded-xl bg-red-50 p-3 text-xs font-semibold text-red-700">{formError}</p>}
         {/* Выбор типа публикации */}
         <div>
           <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2.5">
@@ -291,15 +342,16 @@ export default function CreatePostPage() {
         )}
 
         {/* Фото */}
-        <div>
-          <button
-            type="button"
-            className="w-full flex items-center justify-center gap-2 py-3.5 border-2 border-dashed border-gray-200 rounded-2xl text-xs font-semibold text-gray-500 hover:border-gray-400 hover:text-gray-700 transition"
-          >
-            <ImageIcon className="w-4 h-4 text-green-600" />
-            <span>Прикрепить фото к публикации</span>
-          </button>
-        </div>
+        <label className="w-full flex items-center justify-center gap-2 py-3.5 border-2 border-dashed border-gray-200 rounded-2xl text-xs font-semibold text-gray-500 hover:border-gray-400 hover:text-gray-700 transition cursor-pointer">
+          <ImageIcon className="w-4 h-4 text-green-600" />
+          <span>{imageFile ? imageFile.name : "Прикрепить фото к публикации"}</span>
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="sr-only"
+            onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+          />
+        </label>
       </div>
     </div>
   );

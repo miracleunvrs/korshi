@@ -25,12 +25,14 @@ export default function FeedPage() {
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [selectedTerritory, setSelectedTerritory] = useState("all");
   const [selectedType, setSelectedType] = useState("all");
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   // Quick post creator state
   const [quickPostText, setQuickPostText] = useState("");
   const [quickPostType, setQuickPostType] = useState<"post" | "announcement" | "poll">("post");
 
-  const { posts, addPost, deletePost, likePost, unlikePost, votePoll, supportInitiative, currentUser, urgentAlert, setUrgentAlert } = useAppStore();
+  const { posts, addPost, deletePost, likePost, unlikePost, votePoll, supportInitiative, currentUser, urgentAlert, setUrgentAlert, notifications, markNotificationRead } = useAppStore();
+  const unreadNotifications = notifications.filter((notification) => !notification.isRead).length;
 
   const chips = ["Весь ЖК", "Мой дом", "Мой подъезд", "Официальное", "Объявления", "Опросы"];
 
@@ -41,8 +43,8 @@ export default function FeedPage() {
     const newPost: PostWithAuthor = {
       id: `post-${Date.now()}`,
       author_id: currentUser.id,
-      complex_id: "complex-1",
-      building_id: "building-1",
+      complex_id: currentUser.complexId || "complex-1",
+      building_id: currentUser.buildingId || `building-${currentUser.buildingNumber}`,
       entrance_id: null,
       type: quickPostType,
       title: null,
@@ -118,13 +120,46 @@ export default function FeedPage() {
               <span>Фильтры</span>
             </button>
             <button
-              className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded-full transition"
+              onClick={() => setNotificationsOpen((open) => !open)}
+              className="relative w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded-full transition"
               aria-label="Уведомления"
+              aria-expanded={notificationsOpen}
             >
               <Bell className="w-4 h-4" />
+              {unreadNotifications > 0 && (
+                <span className="absolute mt-[-18px] ml-5 min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-black leading-4">
+                  {unreadNotifications > 9 ? "9+" : unreadNotifications}
+                </span>
+              )}
             </button>
           </div>
         </div>
+
+        {notificationsOpen && (
+          <div className="absolute right-4 sm:right-6 top-14 z-30 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+              <p className="text-sm font-extrabold text-gray-900">Уведомления</p>
+              {unreadNotifications > 0 && <span className="text-xs font-bold text-green-600">{unreadNotifications} новых</span>}
+            </div>
+            <div className="max-h-80 overflow-y-auto">
+              {notifications.length === 0 ? (
+                <p className="px-4 py-8 text-center text-sm text-gray-500">Пока уведомлений нет</p>
+              ) : notifications.map((notification) => (
+                <button
+                  key={notification.id}
+                  onClick={() => { void markNotificationRead(notification.id).catch(() => undefined); }}
+                  className={`w-full border-b border-gray-50 px-4 py-3 text-left transition hover:bg-gray-50 ${notification.isRead ? "opacity-60" : "bg-green-50/60"}`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-sm font-bold text-gray-900">{notification.title}</p>
+                    <span className="shrink-0 text-[10px] text-gray-400">{notification.createdAt}</span>
+                  </div>
+                  {notification.body && <p className="mt-1 text-xs leading-relaxed text-gray-600">{notification.body}</p>}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Чипы фильтрации по аудитории */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">

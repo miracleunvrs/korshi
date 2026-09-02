@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/data/house_repository.dart';
 import '../../../core/widgets/app_chip.dart';
 import '../../../core/widgets/post_card.dart';
 import '../../../core/widgets/empty_state.dart';
@@ -20,21 +22,65 @@ class _FeedScreenState extends State<FeedScreen> {
   bool isLoading = false;
   bool hasError = false;
   bool isOffline = false;
-  late List<Post> posts;
+  List<Post> posts = <Post>[];
+  final HouseRepository repository = HouseRepository();
+  final Set<String> votedPollIds = <String>{};
+  final Set<String> supportedInitiativeIds = <String>{};
+  RealtimeChannel? _syncChannel;
 
   final chips = const ['Весь ЖК', 'Мой дом', 'Мой подъезд', 'Официальное', 'Объявления', 'Опросы'];
 
   @override
   void initState() {
     super.initState();
-    posts = mockPosts();
-    _simulateLoading();
+    if (repository.isConfigured) {
+      _loadRemotePosts();
+      _syncChannel = Supabase.instance.client
+          .channel('housesm-mobile-feed-sync')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'posts',
+            callback: (_) => _loadRemotePosts(),
+          )
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'poll_votes',
+            callback: (_) => _loadRemotePosts(),
+          )
+          .subscribe();
+    }
   }
 
-  Future<void> _simulateLoading() async {
-    setState(() => isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 600));
-    if (mounted) setState(() => isLoading = false);
+  @override
+  void dispose() {
+    if (_syncChannel != null) Supabase.instance.client.removeChannel(_syncChannel!);
+    super.dispose();
+  }
+
+  Future<void> _loadRemotePosts() async {
+    setState(() {
+      isLoading = true;
+      hasError = false;
+      isOffline = false;
+    });
+    try {
+      final remotePosts = await repository.loadPosts();
+      if (!mounted) return;
+      setState(() {
+        posts = remotePosts;
+        isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        isLoading = false;
+        posts = <Post>[];
+        hasError = true;
+        isOffline = true;
+      });
+    }
   }
 
   List<Post> get filteredPosts {
@@ -93,6 +139,10 @@ class _FeedScreenState extends State<FeedScreen> {
   }
 
   Future<void> _onRefresh() async {
+    if (repository.isConfigured) {
+      await _loadRemotePosts();
+      return;
+    }
     await Future.delayed(const Duration(milliseconds: 800));
     if (hasError) setState(() => hasError = false);
   }
@@ -210,7 +260,9 @@ class _FeedScreenState extends State<FeedScreen> {
                         ),
                         const SizedBox(width: 6),
                         IconButton(
-                          onPressed: () {},
+                          onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Уведомления пока пусты')),
+                          ),
                           icon: const Icon(Icons.notifications_none, size: 20),
                           style: IconButton.styleFrom(
                             backgroundColor:
@@ -266,22 +318,45 @@ class _FeedScreenState extends State<FeedScreen> {
                                   final post = filtered[i];
                                   return PostCard(
                                     post: post,
-                                    onLike: (_) => setState(() => post.reactionsCount++),
-                                    onVote: (pollId, optionId) {
+                                    onLike: (liked) {
                                       setState(() {
-                                        final opt =
-                                            post.poll!.options.firstWhere((o) => o.id == optionId);
-                                        opt.votesCount++;
-                                        post.poll!.totalVotes++;
+                                        post.reactionsCount = liked
+                                            ? post.reactionsCount + 1
+                                            : (post.reactionsCount > 0 ? post.reactionsCount - 1 : 0);
                                       });
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Голос учтён'),
-                                          duration: Duration(seconds: 1),
-                                        ),
-                                      );
+                                    },
+                                    // Дополнительная защита от повторных нажатий после перестроения.
+                                    onVote: (pollId, optionId) async {
+                                      if (votedPollIds.contains(pollId)) return;
+                                      votedPollIds.add(pollId);
+                                      final messenger = ScaffoldMessenger.of(context);
+                                      try {
+                                        if (repository.isConfigured) {
+                                          final user = await repository.currentUser();
+                                          if (user == null) throw Exception('Требуется авторизация');
+                                          await repository.vote(pollId, optionId);
+                                        }
+                                        if (!mounted) return;
+                                        setState(() {
+                                          final opt = post.poll!.options.firstWhere((o) => o.id == optionId);
+                                          opt.votesCount++;
+                                          post.poll!.totalVotes++;
+                                        });
+                                        messenger.showSnackBar(
+                                          const SnackBar(content: Text('Голос учтён'), duration: Duration(seconds: 1)),
+                                        );
+                                      } catch (_) {
+                                        votedPollIds.remove(pollId);
+                                        if (mounted) {
+                                          messenger.showSnackBar(
+                                            const SnackBar(content: Text('Не удалось сохранить голос')),
+                                          );
+                                        }
+                                      }
                                     },
                                     onSupportInitiative: (id) {
+                                      if (supportedInitiativeIds.contains(id)) return;
+                                      supportedInitiativeIds.add(id);
                                       setState(() => post.initiative!.supporters++);
                                       ScaffoldMessenger.of(context).showSnackBar(
                                         const SnackBar(content: Text('Спасибо за поддержку!')),

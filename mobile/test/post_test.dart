@@ -22,18 +22,7 @@ void main() {
     });
   });
 
-  group('MockPosts', () {
-    test('returns 4 posts with correct territories', () {
-      final posts = mockPosts();
-      expect(posts.length, 4);
-      expect(posts[0].territory, Territory.complex);
-      expect(posts[2].territory, Territory.entrance);
-      expect(posts[1].poll, isNotNull);
-      expect(posts[1].poll!.options.length, 3);
-      expect(posts[3].fundraiser, isNotNull);
-      expect(posts[3].fundraiser!.progress, greaterThan(0));
-    });
-
+  group('Fundraiser', () {
     test('fundraiser progress clamped', () {
       final f = Fundraiser(id: '1', targetAmount: 100, currentAmount: 150);
       expect(f.progress, 1.0);

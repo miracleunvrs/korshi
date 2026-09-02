@@ -1,4 +1,4 @@
-# HouseSM Mobile — Визуальная проверка
+# Korshi Mobile — Визуальная проверка
 
 ## Методика
 Экраны сверстаны по веб-референсу `src/components/*` + `src/app/(main)/*`. Адаптив проверяется через `LayoutBuilder` + `MediaQuery` + `SafeArea` + `viewInsets`.

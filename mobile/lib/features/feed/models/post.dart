@@ -210,9 +210,102 @@ class Post {
     this.fundraiser,
     this.price,
   });
+
+  factory Post.fromMap(Map<String, dynamic> map) {
+    final author = _first(map['author']) as Map<String, dynamic>?;
+    final attachments = (map['attachments'] as List<dynamic>? ?? const [])
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .map((item) => PostAttachment(
+              id: '${item['id'] ?? ''}',
+              url: '${item['url'] ?? ''}',
+              type: '${item['type'] ?? 'image'}',
+            ))
+        .toList();
+    final poll = _first(map['poll']) as Map<String, dynamic>?;
+    final initiative = _first(map['initiative']) as Map<String, dynamic>?;
+    final fundraiser = _first(map['fundraiser']) as Map<String, dynamic>?;
+
+    return Post(
+      id: '${map['id']}',
+      author: Author(
+        id: '${author?['id'] ?? map['author_id']}',
+        fullName: '${author?['full_name'] ?? 'Сосед'}',
+        avatarUrl: author?['avatar_url'] as String?,
+        verified: author?['verified'] == true,
+        isOfficial: author?['role'] == 'hoa_official',
+      ),
+      type: _postType('${map['type']}'),
+      title: map['title'] as String?,
+      content: '${map['content'] ?? ''}',
+      territory: _territory('${map['territory']}'),
+      isOfficial: map['is_official'] == true,
+      createdAt: DateTime.tryParse('${map['created_at']}') ?? DateTime.now(),
+      attachments: attachments,
+      reactionsCount: (map['reactions_count'] as num?)?.toInt() ?? 0,
+      commentsCount: (map['comments_count'] as num?)?.toInt() ?? 0,
+      viewsCount: (map['views_count'] as num?)?.toInt() ?? 0,
+      poll: poll == null ? null : _pollFromMap(poll),
+      initiative: initiative == null ? null : _initiativeFromMap(initiative),
+      fundraiser: fundraiser == null ? null : _fundraiserFromMap(fundraiser),
+      price: map['price']?.toString(),
+    );
+  }
 }
 
-// Mock data mirroring src/stores/appStore.ts
+dynamic _first(dynamic value) => value is List ? (value.isEmpty ? null : value.first) : value;
+
+PostType _postType(String value) => PostType.values.firstWhere(
+      (type) => type.apiValue == value,
+      orElse: () => PostType.post,
+    );
+
+Territory _territory(String value) => switch (value) {
+      'building' => Territory.building,
+      'entrance' => Territory.entrance,
+      _ => Territory.complex,
+    };
+
+Poll _pollFromMap(Map<String, dynamic> map) {
+  final options = (map['options'] as List<dynamic>? ?? const [])
+      .map((item) => Map<String, dynamic>.from(item as Map))
+      .map((item) => PollOption(
+            id: '${item['id']}',
+            text: '${item['text'] ?? ''}',
+            votesCount: (item['votes_count'] as num?)?.toInt() ?? 0,
+          ))
+      .toList();
+  return Poll(
+    id: '${map['id']}',
+    options: options,
+    totalVotes: (map['total_votes'] as num?)?.toInt() ?? 0,
+    isMultiple: map['is_multiple'] == true,
+    endsAt: DateTime.tryParse('${map['ends_at']}'),
+  );
+}
+
+Initiative _initiativeFromMap(Map<String, dynamic> map) => Initiative(
+      id: '${map['id']}',
+      stage: InitiativeStage.values.firstWhere(
+        (stage) => stage.name == '${map['stage']}',
+        orElse: () => InitiativeStage.proposal,
+      ),
+      goal: '${map['goal'] ?? ''}',
+      supporters: (map['supporters'] as num?)?.toInt() ?? 0,
+    );
+
+Fundraiser _fundraiserFromMap(Map<String, dynamic> map) => Fundraiser(
+      id: '${map['id']}',
+      targetAmount: (map['target_amount'] as num?)?.toInt() ?? 0,
+      currentAmount: (map['current_amount'] as num?)?.toInt() ?? 0,
+      currency: map['currency'] == 'KZT' ? '₸' : '${map['currency'] ?? '₸'}',
+      endsAt: DateTime.tryParse('${map['ends_at']}'),
+    );
+
+/*
+  Legacy demo fixtures were removed. Posts are loaded from Supabase by
+  HouseRepository.loadPosts(), so web and Flutter use the same records.
+*/
+/*
 List<Post> mockPosts() {
   final now = DateTime.now();
   return [
@@ -327,3 +420,4 @@ List<Post> mockPosts() {
     ),
   ];
 }
+*/

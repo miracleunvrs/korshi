@@ -1149,6 +1149,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      review_verification_request: {
+        Args: {
+          p_approved: boolean
+          p_reason?: string | null
+          p_request_id: string
+        }
+        Returns: Database["public"]["Tables"]["verification_requests"]["Row"]
+      }
       auth_user_apartment_id: { Args: never; Returns: string }
       auth_user_complex_id: { Args: never; Returns: string }
       auth_user_role: {

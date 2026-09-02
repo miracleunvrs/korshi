@@ -8,14 +8,10 @@ import {
   Coins, 
   BarChart3, 
   ArrowRight,
-  Sparkles,
   Users
 } from "lucide-react";
-import { useAppStore } from "@/stores/appStore";
 
 export default function RightWidgetPanel() {
-  const { currentUser } = useAppStore();
-
   return (
     <aside className="w-80 shrink-0 hidden lg:flex flex-col gap-4 p-4 sticky top-0 h-screen overflow-y-auto scrollbar-hide">
       {/* Виджет ОСИ и контакты */}

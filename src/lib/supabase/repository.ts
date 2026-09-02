@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import type { PostWithAuthor } from "@/types";
-import type { ChatItem, ClassifiedItem, MessageItem, UserAccount, VerificationRequest } from "@/stores/appStore";
+import type { AppNotification, ChatItem, MessageItem, UserAccount, VerificationRequest } from "@/stores/appStore";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -31,6 +31,9 @@ export async function persistPost(post: PostWithAuthor) {
   if (!configured()) return post.id;
   const { supabase, userId, profile } = await profileContext();
   if (!profile.complex_id) throw new Error("Профиль ещё не привязан к ЖК");
+  if (!profile.verified) {
+    throw new Error("Публикации доступны только подтверждённым жителям. Сначала подтвердите статус жителя.");
+  }
 
   let buildingId = isUuid(post.building_id) ? post.building_id : null;
   let entranceId = isUuid(post.entrance_id) ? post.entrance_id : null;
@@ -215,6 +218,17 @@ export async function persistMessage(chatId: string, content: string) {
   if (error) throw error;
 }
 
+export async function createDirectChat(targetUserId: string) {
+  if (!configured() || !isUuid(targetUserId)) {
+    throw new Error("Этот пользователь ещё не подключён к серверу");
+  }
+  const { data, error } = await (createClient() as any).rpc("create_direct_chat", {
+    p_target_user: targetUserId,
+  });
+  if (error) throw error;
+  return data as string;
+}
+
 export async function deleteMessage(messageId: string) {
   if (!configured() || !isUuid(messageId)) return;
   const { error } = await (createClient() as any).from("messages").update({ is_deleted: true }).eq("id", messageId);
@@ -292,28 +306,12 @@ export async function deleteClassified(id: string) {
 
 export async function reviewVerificationRequest(requestId: string, approved: boolean, reason?: string) {
   if (!configured() || !isUuid(requestId)) return;
-  const { supabase, userId } = await profileContext();
-  const { data: request, error: requestError } = await supabase
-    .from("verification_requests")
-    .select("user_id")
-    .eq("id", requestId)
-    .single();
-  if (requestError) throw requestError;
-  const status = approved ? "approved" : "rejected";
-  const { error } = await supabase.from("verification_requests").update({
-    status,
-    reviewed_by: userId,
-    review_reason: reason || null,
-  }).eq("id", requestId);
+  const { error } = await (createClient() as any).rpc("review_verification_request", {
+    p_request_id: requestId,
+    p_approved: approved,
+    p_reason: reason || null,
+  });
   if (error) throw error;
-  if (approved) {
-    const profileResult = await supabase.from("profiles").update({
-      verified: true,
-      verified_at: new Date().toISOString(),
-      verified_by: userId,
-    }).eq("id", request.user_id);
-    if (profileResult.error) throw profileResult.error;
-  }
 }
 
 export async function recordFundraiserPayment(
@@ -334,6 +332,12 @@ export async function recordFundraiserPayment(
 
 function relation<T>(value: T | T[] | null | undefined): T | null {
   return Array.isArray(value) ? value[0] || null : value || null;
+}
+
+async function signedMediaUrl(supabase: any, path: string | null | undefined) {
+  if (!path || /^https?:\/\//i.test(path)) return path || "";
+  const { data, error } = await supabase.storage.from("house-media").createSignedUrl(path, 60 * 60);
+  return error ? path : data?.signedUrl || path;
 }
 
 function mapPost(row: any): PostWithAuthor {
@@ -360,14 +364,16 @@ export async function hydrateDomainData() {
   if (!configured()) return null;
   const supabase = createClient() as any;
   const userId = await currentUserId();
-  const [postsResult, chatsResult, classifiedsResult] = await Promise.all([
+  const [postsResult, chatsResult, classifiedsResult, notificationsResult] = await Promise.all([
     supabase.from("posts").select("*, author:profiles(id, full_name, avatar_url, role, verified), attachments:post_attachments(*), poll:polls(*, options:poll_options(*)), initiative:initiatives(*), fundraiser:fundraisers(*)").order("created_at", { ascending: false }).limit(50),
     supabase.from("chats").select("*").order("last_message_at", { ascending: false, nullsFirst: false }).limit(100),
-    supabase.from("classifieds").select("*").order("created_at", { ascending: false }).limit(50),
+    supabase.from("classifieds").select("*, author:profiles(id, full_name, phone)").order("created_at", { ascending: false }).limit(50),
+    supabase.from("notifications").select("id, type, title, body, is_read, created_at").order("created_at", { ascending: false }).limit(50),
   ]);
   if (postsResult.error) throw postsResult.error;
   if (chatsResult.error) throw chatsResult.error;
   if (classifiedsResult.error) throw classifiedsResult.error;
+  if (notificationsResult.error) throw notificationsResult.error;
 
   const chats: ChatItem[] = (chatsResult.data || []).map((chat: any) => ({
     id: chat.id,
@@ -381,10 +387,13 @@ export async function hydrateDomainData() {
     isOfficial: chat.is_official,
   }));
 
-  const messageEntries = await Promise.all(chats.map(async (chat) => {
-    const result = await supabase.from("messages").select("*, sender:profiles(full_name, avatar_url, role)").eq("chat_id", chat.id).order("created_at", { ascending: true }).limit(100);
-    if (result.error) throw result.error;
-    return [chat.id, (result.data || []).map((message: any): MessageItem => ({
+  const messageResult = chats.length === 0
+    ? { data: [], error: null }
+    : await supabase.from("messages").select("*, sender:profiles(full_name, avatar_url, role)").in("chat_id", chats.map((chat) => chat.id)).order("created_at", { ascending: true }).limit(1000);
+  if (messageResult.error) throw messageResult.error;
+  const messagesByChat: Record<string, MessageItem[]> = {};
+  for (const message of messageResult.data || []) {
+    (messagesByChat[message.chat_id] ||= []).push({
       id: message.id,
       chatId: message.chat_id,
       senderId: message.sender_id,
@@ -394,22 +403,8 @@ export async function hydrateDomainData() {
       isMe: message.sender_id === userId,
       text: message.is_deleted ? "Сообщение удалено" : message.content || "",
       time: new Date(message.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-    }))] as const;
-  }));
-
-  const classifieds: ClassifiedItem[] = (classifiedsResult.data || []).map((item: any) => ({
-    id: item.id,
-    title: item.title,
-    category: item.category,
-    price: item.price == null ? "Договорная" : `${Number(item.price).toLocaleString("ru-RU")} ${item.currency === "KZT" ? "₸" : item.currency}`,
-    location: item.location || "ЖК «Солнечный»",
-    image: item.image_path || "",
-    description: item.description,
-    authorId: item.author_id,
-    authorName: "Житель ЖК",
-    authorPhone: "",
-    createdAt: new Date(item.created_at).toLocaleDateString("ru-RU"),
-  }));
+    });
+  }
 
   const verificationResult = await supabase
     .from("verification_requests")
@@ -449,12 +444,45 @@ export async function hydrateDomainData() {
     });
   }
 
+  const posts = await Promise.all((postsResult.data || []).map(async (row: any) => {
+    const post = mapPost(row);
+    if (post.attachments?.length) {
+      post.attachments = await Promise.all(post.attachments.map(async (attachment) => ({
+        ...attachment,
+        url: await signedMediaUrl(supabase, attachment.url),
+      })));
+    }
+    return post;
+  }));
+  const classifieds = await Promise.all((classifiedsResult.data || []).map(async (item: any) => ({
+    id: item.id,
+    title: item.title,
+    category: item.category,
+    price: item.price == null ? "Договорная" : `${Number(item.price).toLocaleString("ru-RU")} ${item.currency === "KZT" ? "₸" : item.currency}`,
+    location: item.location || "ЖК «Солнечный»",
+    image: await signedMediaUrl(supabase, item.image_path),
+    description: item.description,
+    authorId: item.author_id,
+    authorName: relation(item.author)?.full_name || "Житель ЖК",
+    authorPhone: relation(item.author)?.phone || "",
+    createdAt: new Date(item.created_at).toLocaleDateString("ru-RU"),
+  })));
+  const notifications: AppNotification[] = (notificationsResult.data || []).map((item: any) => ({
+    id: item.id,
+    type: item.type || "system",
+    title: item.title || "Новое уведомление",
+    body: item.body || "",
+    isRead: Boolean(item.is_read),
+    createdAt: new Date(item.created_at).toLocaleString("ru-RU"),
+  }));
+
   return {
-    posts: (postsResult.data || []).map(mapPost),
+    posts,
     chats,
-    messages: Object.fromEntries(messageEntries),
+    messages: messagesByChat,
     classifieds,
     verificationRequests,
     postComments,
+    notifications,
   };
 }

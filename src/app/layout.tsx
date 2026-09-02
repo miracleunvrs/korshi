@@ -6,13 +6,13 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin", "cyrillic"] });
 
 export const metadata: Metadata = {
-  title: "HouseSM — Сообщество вашего ЖК",
+  title: "Korshi — Сообщество вашего ЖК",
   description: "Единая цифровая среда жилого комплекса",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "HouseSM",
+    title: "Korshi",
   },
 };
 

@@ -14,7 +14,30 @@ export default function PostDetailPage({ params }: { params: Promise<{ postId: s
   const { posts, postComments, addComment, deleteComment, currentUser } = useAppStore();
   const [commentText, setCommentText] = useState("");
 
-  const post = posts.find((p) => p.id === postId) || posts[0];
+  const post = posts.find((p) => p.id === postId);
+
+  if (!post) {
+    return (
+      <div className="min-h-screen bg-white flex flex-col">
+        <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-gray-100 px-6 py-3.5 flex items-center gap-3 shadow-xs">
+          <Link href="/feed" className="text-gray-600 p-1 -ml-1 hover:text-gray-900 transition">
+            <ArrowLeft className="w-5 h-5" />
+          </Link>
+          <h1 className="font-bold text-gray-900 text-sm">Публикация</h1>
+        </div>
+        <div className="flex-1 flex items-center justify-center p-6 text-center">
+          <div className="space-y-2">
+            <p className="text-sm font-bold text-gray-900">Публикация не найдена</p>
+            <p className="text-xs text-gray-500">Она могла быть удалена или ещё загружается.</p>
+            <Link href="/feed" className="inline-block mt-3 text-xs font-bold text-green-600 hover:text-green-700">
+              Вернуться в ленту
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const comments = postComments[post.id] || [];
 
   const handleSendComment = (e: React.FormEvent) => {

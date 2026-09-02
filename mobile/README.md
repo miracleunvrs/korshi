@@ -1,6 +1,6 @@
-# HouseSM Mobile (Flutter)
+# Korshi Mobile (Flutter)
 
-Нативное мобильное приложение для жителей ЖК HouseSM (iOS & Android).
+Нативное мобильное приложение Korshi для жителей ЖК (iOS & Android).
 
 ## Стек
 - **Flutter** 3.x / Dart 3.x
@@ -48,3 +48,5 @@ flutter test
 ```bash
 flutter run --dart-define=SUPABASE_URL=https://your-project.supabase.co --dart-define=SUPABASE_ANON_KEY=your-anon-key
 ```
+
+Без этих параметров приложение не запускает демо-данные и явно сообщает, что конфигурация не задана. Используйте те же значения, что и веб-версия: `NEXT_PUBLIC_SUPABASE_URL` и `NEXT_PUBLIC_SUPABASE_ANON_KEY`.

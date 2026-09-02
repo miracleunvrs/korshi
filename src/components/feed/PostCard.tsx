@@ -34,7 +34,14 @@ export default function PostCard({ post, onVote, onSupportInitiative, onLike, on
     complex: "Весь ЖК",
     building: "Мой дом",
     entrance: "Мой подъезд",
-  }[post.territory];
+  }[post.territory] || "ЖК";
+
+  let timeAgo = '';
+  try {
+    timeAgo = formatDistanceToNow(new Date(post.created_at), { addSuffix: true, locale: ru });
+  } catch {
+    timeAgo = 'недавно';
+  }
 
   return (
     <article className="bg-white border-b border-gray-100 p-4 space-y-3">
@@ -64,7 +71,7 @@ export default function PostCard({ post, onVote, onSupportInitiative, onLike, on
               <span>{territoryBadge}</span>
               <span>•</span>
               <span>
-                {formatDistanceToNow(new Date(post.created_at), { addSuffix: true, locale: ru })}
+                {timeAgo}
               </span>
             </div>
           </div>
@@ -74,15 +81,17 @@ export default function PostCard({ post, onVote, onSupportInitiative, onLike, on
           <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">
             {POST_TYPE_LABELS[post.type] || post.type}
           </span>
-          <button
-            className="text-gray-400 p-1 hover:text-gray-600"
-            aria-label="Удалить публикацию"
-            onClick={() => {
-              if (onDelete && window.confirm("Удалить эту публикацию?")) onDelete(post.id);
-            }}
-          >
-            <MoreHorizontal className="w-4 h-4" />
-          </button>
+          {onDelete && (
+            <button
+              className="text-gray-400 p-1 hover:text-gray-600"
+              aria-label="Снять публикацию"
+              onClick={() => {
+                if (window.confirm("Снять эту публикацию? Она исчезнет из ленты.")) onDelete(post.id);
+              }}
+            >
+              <MoreHorizontal className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -180,30 +189,40 @@ export default function PostCard({ post, onVote, onSupportInitiative, onLike, on
       {/* Виджет: Сбор средств */}
       {post.type === "fundraiser" && post.fundraiser && (
         <div className="mt-3 p-3.5 bg-amber-50/60 border border-amber-200/60 rounded-2xl space-y-2.5">
-          <div className="flex justify-between items-center text-xs">
-            <span className="text-amber-900 font-semibold">Активный сбор</span>
-            <span className="text-amber-700 font-medium">
-              {Math.round((post.fundraiser.current_amount / post.fundraiser.target_amount) * 100)}% собрано
-            </span>
-          </div>
+          {(() => {
+            const progress = post.fundraiser.target_amount > 0
+              ? (post.fundraiser.current_amount / post.fundraiser.target_amount) * 100
+              : 0;
 
-          <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden">
-            <div
-              className="bg-green-600 h-full rounded-full transition-all"
-              style={{
-                width: `${Math.min(100, (post.fundraiser.current_amount / post.fundraiser.target_amount) * 100)}%`,
-              }}
-            />
-          </div>
+            return (
+              <>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-amber-900 font-semibold">Активный сбор</span>
+                  <span className="text-amber-700 font-medium">
+                    {Math.round(progress)}% собрано
+                  </span>
+                </div>
 
-          <div className="flex justify-between items-baseline">
-            <span className="text-base font-bold text-gray-900">
-              {post.fundraiser.current_amount.toLocaleString("ru-RU")} ₸
-            </span>
-            <span className="text-xs text-gray-500">
-              из {post.fundraiser.target_amount.toLocaleString("ru-RU")} ₸
-            </span>
-          </div>
+                <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden">
+                  <div
+                    className="bg-green-600 h-full rounded-full transition-all"
+                    style={{
+                      width: `${Math.min(100, progress)}%`,
+                    }}
+                  />
+                </div>
+
+                <div className="flex justify-between items-baseline">
+                  <span className="text-base font-bold text-gray-900">
+                    {post.fundraiser.current_amount.toLocaleString("ru-RU")} ₸
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    из {post.fundraiser.target_amount.toLocaleString("ru-RU")} ₸
+                  </span>
+                </div>
+              </>
+            );
+          })()}
 
           <Link
             href={`/hoa/fundraisers/${post.fundraiser.id}`}

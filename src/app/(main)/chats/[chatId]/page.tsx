@@ -68,7 +68,7 @@ export default function ChatRoomPage({ params }: { params: Promise<{ chatId: str
           </div>
         ) : (
           chatMessages.map((m) => {
-            const isMe = m.isMe || m.senderName === currentUser.fullName;
+            const isMe = m.isMe || m.senderId === currentUser.id;
             return (
               <div
                 key={m.id}

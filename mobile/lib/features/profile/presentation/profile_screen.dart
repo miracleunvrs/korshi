@@ -1,6 +1,8 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../core/data/house_repository.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radius.dart';
 
@@ -11,14 +13,48 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  String fullName = 'Мария Иванова';
-  String phone = '+7 (777) 234-56-78';
-  String building = '2';
-  String apartment = '45';
-  bool verified = true;
-  String avatarUrl =
-      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80';
+  final _repository = HouseRepository();
+  String fullName = '';
+  String phone = '';
+  String building = '—';
+  String apartment = '—';
+  bool verified = false;
+  String avatarUrl = '';
   String? activeModal;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRemoteProfile();
+  }
+
+  Future<void> _loadRemoteProfile() async {
+    if (!_repository.isConfigured) return;
+    try {
+      final profile = await _repository.loadProfile();
+      if (!mounted || profile == null) return;
+      Map<String, dynamic>? asMap(dynamic value) =>
+          value is Map ? Map<String, dynamic>.from(value) : null;
+      final apartmentData = asMap(profile['apartment']);
+      final entrance = asMap(apartmentData?['entrance']);
+      final buildingData = asMap(entrance?['building']);
+      setState(() {
+        fullName = profile['full_name'] ?? fullName;
+        phone = profile['phone'] ?? phone;
+        avatarUrl = profile['avatar_url'] ?? avatarUrl;
+        verified = profile['verified'] == true;
+        apartment = apartmentData?['number']?.toString() ?? apartment;
+        building = buildingData?['number']?.toString() ?? building;
+      });
+    } catch (_) {
+      // The demo profile remains visible if the backend is unavailable.
+    }
+  }
+
+  Future<void> _signOut() async {
+    await _repository.signOut();
+    if (mounted) context.go('/login');
+  }
 
   void _openEdit() {
     final nameCtrl = TextEditingController(text: fullName);
@@ -71,14 +107,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton(
-                      onPressed: () {
+                      onPressed: () async {
                         setState(() {
                           fullName = nameCtrl.text;
                           phone = phoneCtrl.text;
                           building = buildingCtrl.text;
                           apartment = apartmentCtrl.text;
                         });
-                        Navigator.pop(ctx);
+                        try {
+                          await _repository.updateProfile(fullName: fullName, phone: phone);
+                        } catch (_) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Не удалось сохранить профиль')),
+                            );
+                          }
+                        }
+                        if (ctx.mounted) Navigator.pop(ctx);
                       },
                       style: FilledButton.styleFrom(
                         backgroundColor: AppColors.primary,
@@ -319,7 +364,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 style: TextStyle(fontSize: 11, color: Color(0xFFB45309)))
                           ])),
                           FilledButton(
-                              onPressed: () {},
+                              onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Откройте веб-версию для загрузки документа')),
+                              ),
                               style: FilledButton.styleFrom(
                                   backgroundColor: AppColors.primary,
                                   shape: RoundedRectangleBorder(
@@ -371,9 +418,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
+                  if (_repository.isConfigured)
+                    TextButton.icon(
+                      onPressed: _signOut,
+                      icon: const Icon(Icons.logout, color: Colors.redAccent),
+                      label: const Text('Выйти из аккаунта', style: TextStyle(color: Colors.redAccent)),
+                    ),
                   Padding(
                       padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 80),
-                      child: Text('HouseSM • версия 1.0.0',
+                      child: Text('Korshi • версия 1.0.0',
                           style: TextStyle(
                               fontSize: 11,
                               color: isDark ? const Color(0xFF475569) : const Color(0xFF94A3B8)))),

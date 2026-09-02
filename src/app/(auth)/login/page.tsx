@@ -4,16 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ShieldCheck, ArrowRight, CheckCircle2 } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { loginUser, registerUser, resetPassword, switchAccount, registeredUsers } = useAppStore();
-  const demoMode = !isSupabaseConfigured();
+  const { loginUser, registerUser, resetPassword } = useAppStore();
 
-  const [activeTab, setActiveTab] = useState<"login" | "register" | "demo">(
-    demoMode ? "demo" : "login"
-  );
+  const [activeTab, setActiveTab] = useState<"login" | "register">("login");
 
   // Login form
   const [loginEmail, setLoginEmail] = useState("");
@@ -109,11 +105,6 @@ export default function LoginPage() {
     }
   };
 
-  const handleQuickDemo = (userId: string) => {
-    switchAccount(userId);
-    router.push("/feed");
-  };
-
   return (
     <div className="min-h-screen bg-[#09090b] flex flex-col justify-center items-center p-4 sm:p-6 text-white selection:bg-green-500 selection:text-white">
       <div className="w-full max-w-md bg-white text-gray-900 rounded-[36px] p-6 sm:p-8 shadow-2xl space-y-6">
@@ -131,16 +122,6 @@ export default function LoginPage() {
 
         {/* Табы */}
         <div className="flex bg-gray-100 p-1 rounded-2xl text-xs font-bold">
-          {demoMode && (
-            <button
-              onClick={() => setActiveTab("demo")}
-              className={`flex-1 py-2.5 rounded-xl transition ${
-                activeTab === "demo" ? "bg-white text-gray-900 shadow-xs" : "text-gray-500 hover:text-gray-900"
-              }`}
-            >
-              Быстрый вход
-            </button>
-          )}
           <button
             onClick={() => setActiveTab("register")}
             className={`flex-1 py-2.5 rounded-xl transition ${
@@ -159,46 +140,7 @@ export default function LoginPage() {
           </button>
         </div>
 
-        {/* Вкладка 1: Быстрый демо-вход */}
-        {activeTab === "demo" && (
-          <div className="space-y-3">
-            <p className="text-xs text-gray-500 text-center font-medium">
-              Выберите роль для мгновенного входа:
-            </p>
-            <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
-              {registeredUsers.map((acc) => (
-                <div
-                  key={acc.id}
-                  onClick={() => handleQuickDemo(acc.id)}
-                  className="p-3 rounded-2xl border border-gray-200/80 hover:border-green-500 hover:bg-green-50/50 transition cursor-pointer flex items-center justify-between group"
-                >
-                  <div className="flex items-center gap-3">
-                    <img
-                      src={acc.avatarUrl}
-                      alt={acc.fullName}
-                      className="w-10 h-10 rounded-xl object-cover ring-2 ring-gray-100 shrink-0"
-                    />
-                    <div>
-                      <div className="flex items-center gap-1">
-                        <p className="font-bold text-gray-900 text-xs group-hover:text-green-700 transition">
-                          {acc.fullName}
-                        </p>
-                        {acc.verified && <ShieldCheck className="w-3.5 h-3.5 text-green-600" />}
-                      </div>
-                      <p className="text-[11px] font-semibold text-green-700">{acc.roleLabel}</p>
-                      <p className="text-[10px] text-gray-400">{acc.phone}</p>
-                    </div>
-                  </div>
-                  <span className="text-xs font-bold text-gray-400 group-hover:text-green-600 group-hover:translate-x-0.5 transition-transform">
-                    Войти →
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Вкладка 2: Регистрация нового жильца */}
+        {/* Регистрация нового жильца */}
         {activeTab === "register" && (
           <form onSubmit={handleRegisterSubmit} className="space-y-3">
             {regSuccess ? (
@@ -251,11 +193,7 @@ export default function LoginPage() {
                     minLength={6}
                     required
                   />
-                  <button type="button" onClick={handleResetPassword} className="mt-2 text-[11px] font-bold text-green-700 hover:text-green-800">
-                    Забыли пароль?
-                  </button>
                 </div>
-                {resetSent && <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-xs text-green-800">Письмо для смены пароля отправлено на email.</div>}
 
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">
@@ -357,7 +295,7 @@ export default function LoginPage() {
           </form>
         )}
 
-        {/* Вкладка 3: Вход */}
+        {/* Вход */}
         {activeTab === "login" && (
           <form onSubmit={handleLoginSubmit} className="space-y-4">
             <>
@@ -382,8 +320,12 @@ export default function LoginPage() {
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-green-500"
                     required
                   />
+                  <button type="button" onClick={handleResetPassword} className="mt-2 text-[11px] font-bold text-green-700 hover:text-green-800">
+                    Забыли пароль?
+                  </button>
                 </div>
             </>
+            {resetSent && <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-xs text-green-800">Письмо для смены пароля отправлено на email.</div>}
 
             {loginError && (
               <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-medium">

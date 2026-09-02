@@ -1,6 +1,7 @@
 "use client";
 
 import { X, Check } from "lucide-react";
+import { useEffect } from "react";
 
 interface FeedFilterModalProps {
   isOpen: boolean;
@@ -21,6 +22,26 @@ export default function FeedFilterModal({
   onSelectType,
   onReset,
 }: FeedFilterModalProps) {
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleEscape);
+
+    if (!isOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    const previousPaddingRight = document.body.style.paddingRight;
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    document.body.style.overflow = "hidden";
+    if (scrollbarWidth > 0) document.body.style.paddingRight = `${scrollbarWidth}px`;
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.body.style.paddingRight = previousPaddingRight;
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const territories = [
@@ -39,8 +60,17 @@ export default function FeedFilterModal({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm transition-opacity">
-      <div className="w-full max-w-lg bg-[#18181b] text-white rounded-t-3xl sm:rounded-3xl p-5 space-y-6 animate-in slide-in-from-bottom duration-200">
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm transition-opacity"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Фильтры"
+    >
+      <div
+        className="w-full max-w-lg max-h-[90vh] overflow-y-auto overscroll-contain bg-[#18181b] text-white rounded-t-3xl sm:rounded-3xl p-5 space-y-6 animate-in slide-in-from-bottom duration-200"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between pb-2 border-b border-gray-800">
           <div className="flex items-center gap-3">

@@ -24,7 +24,8 @@ export default function AdminPage() {
     approveVerification, 
     rejectVerification, 
     urgentAlert, 
-    setUrgentAlert 
+    setUrgentAlert,
+    currentUser,
   } = useAppStore();
 
   const [activeTab, setActiveTab] = useState<"requests" | "residents" | "alert" | "stats">("requests");
@@ -33,6 +34,16 @@ export default function AdminPage() {
   // Urgent alert form
   const [alertTitle, setAlertTitle] = useState(urgentAlert?.title || "");
   const [alertMessage, setAlertMessage] = useState(urgentAlert?.message || "");
+
+  if (currentUser.role !== "admin" && currentUser.role !== "hoa_official") {
+    return (
+      <div className="min-h-screen bg-white p-8 flex flex-col items-center justify-center text-center gap-4">
+        <ShieldCheck className="w-10 h-10 text-gray-300" />
+        <p className="text-sm font-semibold text-gray-600">Доступ только для администратора</p>
+        <Link href="/feed" className="text-sm font-bold text-green-700">Вернуться в ленту</Link>
+      </div>
+    );
+  }
 
   const handleSaveAlert = (e: React.FormEvent) => {
     e.preventDefault();

@@ -13,20 +13,18 @@ import {
   ShieldCheck, 
   Settings, 
   ShieldAlert,
-  Repeat,
   LogOut
 } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
-import AccountSwitcherModal from "@/components/auth/AccountSwitcherModal";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { currentUser, chats, verificationRequests, logoutUser } = useAppStore();
-  const [isSwitcherOpen, setIsSwitcherOpen] = useState(false);
+  const currentUser = useAppStore((s) => s.currentUser);
+  const chats = useAppStore((s) => s.chats);
+  const verificationRequests = useAppStore((s) => s.verificationRequests);
+  const logoutUser = useAppStore((s) => s.logoutUser);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const realAuthEnabled = isSupabaseConfigured();
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -50,6 +48,8 @@ export default function Sidebar() {
     { href: "/profile", label: "Моя страница", icon: User },
     { href: "/admin", label: "Панель управления", icon: ShieldAlert, badge: pendingRequests > 0 ? pendingRequests : undefined, isAdmin: true },
   ];
+
+  const visibleMenuItems = menuItems.filter((item) => !item.isAdmin || currentUser.role === 'admin' || currentUser.role === 'hoa_official');
 
   return (
     <>
@@ -87,20 +87,11 @@ export default function Sidebar() {
               </div>
             </Link>
 
-            {!realAuthEnabled && (
-              <button
-                onClick={() => setIsSwitcherOpen(true)}
-                className="w-full py-1.5 px-2 bg-white hover:bg-gray-100/90 text-gray-600 rounded-xl text-[11px] font-bold border border-gray-200/80 flex items-center justify-center gap-1.5 transition shadow-2xs"
-              >
-                <Repeat className="w-3 h-3 text-green-600" />
-                <span>Сменить аккаунт / Роль</span>
-              </button>
-            )}
           </div>
 
           {/* Меню навигации */}
           <nav className="space-y-1">
-            {menuItems.map((item) => {
+            {visibleMenuItems.map((item) => {
               const isActive = pathname === item.href || (item.href !== "/feed" && pathname.startsWith(item.href));
               const Icon = item.icon;
 
@@ -150,7 +141,7 @@ export default function Sidebar() {
             {isLoggingOut ? "Выход..." : "Выйти из аккаунта"}
           </button>
           <div className="text-xs text-gray-400 flex items-center justify-between">
-            <span>© 2026 HouseSM</span>
+            <span>© 2026 Korshi</span>
             <Link href="/profile" className="hover:text-gray-600">
               <Settings className="w-4 h-4" />
             </Link>
@@ -158,10 +149,6 @@ export default function Sidebar() {
         </div>
       </aside>
 
-      <AccountSwitcherModal
-        isOpen={isSwitcherOpen}
-        onClose={() => setIsSwitcherOpen(false)}
-      />
     </>
   );
 }

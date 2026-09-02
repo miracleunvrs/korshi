@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radius.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/data/house_repository.dart';
 
 class ClassifiedsScreen extends StatefulWidget {
   const ClassifiedsScreen({super.key});
@@ -14,45 +15,81 @@ class ClassifiedsScreen extends StatefulWidget {
 class _ClassifiedsScreenState extends State<ClassifiedsScreen> {
   String activeTab = 'Все';
   String searchQuery = '';
+  final repository = HouseRepository();
+  List<Map<String, dynamic>> items = [];
+  bool isLoading = true;
 
-  final items = [
-    {
-      'id': '1',
-      'title': 'Продам диван',
-      'category': 'Объявления',
-      'price': '5 000 ₸',
-      'location': 'Дом 2 • 3 минуты назад',
-      'image':
-          'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=400&auto=format&fit=crop&q=80',
-    },
-    {
-      'id': '2',
-      'title': 'Услуги электрика',
-      'category': 'Услуги',
-      'price': 'от 500 ₸',
-      'location': 'Дом 1 • 25 минут назад',
-      'image':
-          'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=400&auto=format&fit=crop&q=80',
-    },
-    {
-      'id': '3',
-      'title': 'Няня для ребёнка',
-      'category': 'Подработки',
-      'price': 'Договорная',
-      'location': 'Дом 1 • 1 час назад',
-      'image':
-          'https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?w=400&auto=format&fit=crop&q=80',
-    },
-    {
-      'id': '4',
-      'title': 'Помогу с уборкой',
-      'category': 'Помощь',
-      'price': 'Договорная',
-      'location': 'Подъезд 2 • 2 часа назад',
-      'image':
-          'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=400&auto=format&fit=crop&q=80',
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    if (!repository.isConfigured) return;
+    try {
+      final remote = await repository.loadClassifieds();
+      if (mounted) setState(() => items = remote);
+    } finally {
+      if (mounted) setState(() => isLoading = false);
+    }
+  }
+
+  Future<void> _createClassified() async {
+    final titleController = TextEditingController();
+    final descriptionController = TextEditingController();
+    final priceController = TextEditingController();
+    var category = 'Объявления';
+    final created = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Новое объявление'),
+          content: SingleChildScrollView(
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              TextField(controller: titleController, decoration: const InputDecoration(labelText: 'Заголовок')),
+              DropdownButtonFormField<String>(
+                value: category,
+                items: const ['Объявления', 'Услуги', 'Подработки', 'Помощь']
+                    .map((value) => DropdownMenuItem(value: value, child: Text(value)))
+                    .toList(),
+                onChanged: (value) => setDialogState(() => category = value ?? category),
+                decoration: const InputDecoration(labelText: 'Категория'),
+              ),
+              TextField(controller: priceController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Цена, ₸ (необязательно)')),
+              TextField(controller: descriptionController, maxLines: 3, decoration: const InputDecoration(labelText: 'Описание')),
+            ]),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Отмена')),
+            FilledButton(
+              onPressed: () async {
+                if (titleController.text.trim().isEmpty || descriptionController.text.trim().isEmpty) return;
+                try {
+                  await repository.createClassified(
+                    title: titleController.text,
+                    category: category,
+                    description: descriptionController.text,
+                    price: priceController.text,
+                  );
+                  if (dialogContext.mounted) Navigator.pop(dialogContext, true);
+                } catch (error) {
+                  if (dialogContext.mounted) {
+                    ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text('$error')));
+                  }
+                }
+              },
+              child: const Text('Опубликовать'),
+            ),
+          ],
+        ),
+      ),
+    );
+    titleController.dispose();
+    descriptionController.dispose();
+    priceController.dispose();
+    if (created == true) await _load();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -95,7 +132,7 @@ class _ClassifiedsScreenState extends State<ClassifiedsScreen> {
                         ),
                       ),
                       TextButton.icon(
-                        onPressed: () {},
+                        onPressed: _createClassified,
                         icon: const Icon(Icons.add, size: 14, color: AppColors.primary),
                         label: const Text(
                           'Подать',
@@ -190,7 +227,9 @@ class _ClassifiedsScreenState extends State<ClassifiedsScreen> {
               ),
             ),
             Expanded(
-              child: filtered.isEmpty
+              child: isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : filtered.isEmpty
                   ? const EmptyState(
                       icon: Icons.search_off,
                       title: 'Ничего не найдено',
@@ -206,7 +245,16 @@ class _ClassifiedsScreenState extends State<ClassifiedsScreen> {
                       itemBuilder: (context, i) {
                         final it = filtered[i];
                         return InkWell(
-                          onTap: () {},
+                          onTap: () => showDialog<void>(
+                            context: context,
+                            builder: (_) => AlertDialog(
+                              title: Text(it['title'] as String? ?? 'Объявление'),
+                              content: Text(it['description'] as String? ?? ''),
+                              actions: [
+                                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Закрыть')),
+                              ],
+                            ),
+                          ),
                           child: Padding(
                             padding: const EdgeInsets.all(16),
                             child: Row(
@@ -214,7 +262,7 @@ class _ClassifiedsScreenState extends State<ClassifiedsScreen> {
                                 ClipRRect(
                                   borderRadius: AppRadius.radiusLg,
                                   child: CachedNetworkImage(
-                                    imageUrl: it['image'] as String,
+                                    imageUrl: (it['image_path'] ?? '') as String,
                                     width: 64,
                                     height: 64,
                                     fit: BoxFit.cover,
@@ -246,7 +294,7 @@ class _ClassifiedsScreenState extends State<ClassifiedsScreen> {
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
-                                        it['price'] as String,
+                                        (it['price_label'] ?? 'Договорная') as String,
                                         style: const TextStyle(
                                           fontSize: 13,
                                           fontWeight: FontWeight.w700,

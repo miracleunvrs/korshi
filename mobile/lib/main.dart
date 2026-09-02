@@ -8,6 +8,10 @@ import 'navigation/app_router.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (SupabaseConfig.isPlaceholder) {
+    runApp(const _ConfigurationRequiredApp());
+    return;
+  }
   // Системные оверлеи — как в вебе themeColor #16a34a
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -18,13 +22,36 @@ void main() async {
       systemNavigationBarIconBrightness: Brightness.dark,
     ),
   );
-  // Supabase — не падаем в демо режиме (placeholder ключи)
   try {
     await SupabaseConfig.initialize();
   } catch (e) {
-    debugPrint('Supabase init skipped (demo mode): $e');
+    runApp(_ConfigurationRequiredApp(error: e.toString()));
+    return;
   }
   runApp(const ProviderScope(child: HouseSMApp()));
+}
+
+class _ConfigurationRequiredApp extends StatelessWidget {
+  final String? error;
+  const _ConfigurationRequiredApp({this.error});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Korshi',
+      home: Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              error ?? 'Укажите SUPABASE_URL и SUPABASE_ANON_KEY при запуске Flutter.',
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class HouseSMApp extends ConsumerWidget {
@@ -35,7 +62,7 @@ class HouseSMApp extends ConsumerWidget {
     final router = ref.watch(appRouterProvider);
 
     return MaterialApp.router(
-      title: 'HouseSM',
+      title: 'Korshi',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,

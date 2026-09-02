@@ -1,12 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, Circle, Clock, MessageSquare, ThumbsUp, ShieldCheck } from "lucide-react";
+import { useAppStore } from "@/stores/appStore";
 
-export default function InitiativeDetailPage() {
+export default function InitiativeDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+  const { posts, supportInitiative, currentUser } = useAppStore();
+  const post = posts.find((item) => item.initiative?.id === id) || posts.find((item) => item.type === "initiative");
+  const initiative = post?.initiative;
   const [supported, setSupported] = useState(false);
-  const [supportCount, setSupportCount] = useState(24);
+  const [supportCount, setSupportCount] = useState(initiative?.supporters || 0);
 
   const stages = [
     { title: "Предложение", desc: "15 мая • Алексей Петров", completed: true },
@@ -43,7 +48,7 @@ export default function InitiativeDetailPage() {
             На рассмотрении
           </div>
           <h2 className="text-lg font-bold text-gray-900 leading-snug">
-            Установка камеры видеонаблюдения в подъезде 2
+            {post?.title || "Инициатива жителей"}
           </h2>
 
           <div className="flex items-center gap-3 mt-3">
@@ -51,15 +56,15 @@ export default function InitiativeDetailPage() {
               АП
             </div>
             <div>
-              <p className="text-xs font-semibold text-gray-900">Алексей Петров</p>
-              <p className="text-[11px] text-gray-400">Подъезд 2 • Собственник</p>
+              <p className="text-xs font-semibold text-gray-900">{post?.author.full_name || "Житель ЖК"}</p>
+              <p className="text-[11px] text-gray-400">{post?.territory === "entrance" ? "Подъезд" : "ЖК"} • {post?.author.role === "hoa_official" ? "ОСИ" : "Житель"}</p>
             </div>
           </div>
         </div>
 
         {/* Описание */}
         <div className="text-sm text-gray-700 leading-relaxed bg-gray-50 p-4 rounded-2xl">
-          Предлагаю установить современную камеру видеонаблюдения на первом этаже подъезда 2 для повышения безопасности жителей, сохранности колясок и велосипедов.
+          {post?.content || initiative?.goal || "Описание инициативы пока не добавлено."}
         </div>
 
         {/* Таймлайн этапов */}
@@ -94,14 +99,20 @@ export default function InitiativeDetailPage() {
         {/* Статистика */}
         <div className="flex items-center justify-between py-3 border-y border-gray-100 text-xs text-gray-500">
           <span>Поддержали: <strong className="text-gray-900">{supportCount}</strong></span>
-          <span>Комментарии: <strong className="text-gray-900">8</strong></span>
+          <span>Комментарии: <strong className="text-gray-900">{post?.comments_count || 0}</strong></span>
         </div>
       </div>
 
       {/* Фиксированная кнопка внизу */}
       <div className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto p-4 bg-white/95 backdrop-blur-md border-t border-gray-100">
         <button
-          onClick={handleSupport}
+          onClick={() => {
+            if (supported || !initiative) return;
+            supportInitiative(initiative.id);
+            setSupported(true);
+            setSupportCount((count) => count + 1);
+          }}
+          disabled={!initiative || currentUser.role === "service_provider"}
           className={`w-full py-3.5 rounded-xl font-medium text-sm flex items-center justify-center gap-2 transition ${
             supported
               ? "bg-green-100 text-green-800"

@@ -10,7 +10,7 @@ import 'territory_badge.dart';
 
 class PostCard extends StatefulWidget {
   final Post post;
-  final ValueChanged<Post>? onLike;
+  final ValueChanged<bool>? onLike;
   final void Function(String pollId, String optionId)? onVote;
   final ValueChanged<String>? onSupportInitiative;
   final VoidCallback? onTap;
@@ -30,7 +30,9 @@ class PostCard extends StatefulWidget {
 
 class _PostCardState extends State<PostCard> {
   bool isLiked = false;
+  bool isSupported = false;
   String? selectedOption;
+  bool hasVoted = false;
 
   String _timeAgo(DateTime dt) {
     final diff = DateTime.now().difference(dt);
@@ -127,7 +129,9 @@ class _PostCardState extends State<PostCard> {
                   const SizedBox(width: 4),
                   IconButton(
                     icon: const Icon(Icons.more_horiz, size: 18, color: Color(0xFF94A3B8)),
-                    onPressed: () {},
+                    onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Дополнительные действия пока недоступны')),
+                    ),
                     visualDensity: VisualDensity.compact,
                     constraints: const BoxConstraints(),
                     padding: const EdgeInsets.all(6),
@@ -176,9 +180,13 @@ class _PostCardState extends State<PostCard> {
                 _PollWidget(
                   poll: post.poll!,
                   selectedOption: selectedOption,
-                  onSelect: (id) => setState(() => selectedOption = id),
+                  hasVoted: hasVoted,
+                  onSelect: (id) {
+                    if (!hasVoted) setState(() => selectedOption = id);
+                  },
                   onVote: () {
-                    if (selectedOption != null && widget.onVote != null) {
+                    if (!hasVoted && selectedOption != null && widget.onVote != null) {
+                      setState(() => hasVoted = true);
                       widget.onVote!(post.poll!.id, selectedOption!);
                     }
                   },
@@ -186,7 +194,13 @@ class _PostCardState extends State<PostCard> {
               if (post.initiative != null)
                 _InitiativeWidget(
                   initiative: post.initiative!,
-                  onSupport: () => widget.onSupportInitiative?.call(post.initiative!.id),
+                  isSupported: isSupported,
+                  onSupport: () {
+                    if (!isSupported) {
+                      setState(() => isSupported = true);
+                      widget.onSupportInitiative?.call(post.initiative!.id);
+                    }
+                  },
                 ),
               if (post.fundraiser != null) _FundraiserWidget(fundraiser: post.fundraiser!),
               const SizedBox(height: 12),
@@ -203,11 +217,12 @@ class _PostCardState extends State<PostCard> {
                     _ActionButton(
                       icon: isLiked ? Icons.favorite : Icons.favorite_border,
                       color: isLiked ? const Color(0xFFEF4444) : const Color(0xFF94A3B8),
-                      label: '${post.reactionsCount + (isLiked ? 1 : 0)}',
+                      label: '${post.reactionsCount}',
                       active: isLiked,
                       onTap: () {
-                        setState(() => isLiked = !isLiked);
-                        widget.onLike?.call(post);
+                        final nextLiked = !isLiked;
+                        setState(() => isLiked = nextLiked);
+                        widget.onLike?.call(nextLiked);
                       },
                     ),
                     const SizedBox(width: 16),
@@ -217,7 +232,12 @@ class _PostCardState extends State<PostCard> {
                       onTap: widget.onTap,
                     ),
                     const Spacer(),
-                    _ActionButton(icon: Icons.share_outlined, onTap: () {}),
+                    _ActionButton(
+                      icon: Icons.share_outlined,
+                      onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Ссылка на публикацию скопирована')),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -273,11 +293,13 @@ class _ActionButton extends StatelessWidget {
 class _PollWidget extends StatelessWidget {
   final Poll poll;
   final String? selectedOption;
+  final bool hasVoted;
   final ValueChanged<String> onSelect;
   final VoidCallback onVote;
   const _PollWidget({
     required this.poll,
     required this.selectedOption,
+    required this.hasVoted,
     required this.onSelect,
     required this.onVote,
   });
@@ -301,7 +323,7 @@ class _PollWidget extends StatelessWidget {
             return Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: GestureDetector(
-                onTap: () => onSelect(opt.id),
+                onTap: hasVoted ? null : () => onSelect(opt.id),
                 child: Container(
                   width: double.infinity,
                   clipBehavior: Clip.antiAlias,
@@ -353,15 +375,15 @@ class _PollWidget extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: FilledButton(
-              onPressed: selectedOption == null ? null : onVote,
+              onPressed: hasVoted || selectedOption == null ? null : onVote,
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 disabledBackgroundColor: AppColors.primary.withOpacity(0.4),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),
-              child: const Text(
-                'Проголосовать',
+              child: Text(
+                hasVoted ? 'Голос учтён' : 'Проголосовать',
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white),
               ),
             ),
@@ -374,8 +396,9 @@ class _PollWidget extends StatelessWidget {
 
 class _InitiativeWidget extends StatelessWidget {
   final Initiative initiative;
+  final bool isSupported;
   final VoidCallback onSupport;
-  const _InitiativeWidget({required this.initiative, required this.onSupport});
+  const _InitiativeWidget({required this.initiative, required this.isSupported, required this.onSupport});
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -452,14 +475,14 @@ class _InitiativeWidget extends StatelessWidget {
                 ),
               ),
               FilledButton(
-                onPressed: onSupport,
+                onPressed: isSupported ? null : onSupport,
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                child: const Text(
-                  'Поддержать',
+                  child: Text(
+                    isSupported ? 'Поддержано' : 'Поддержать',
                   style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white),
                 ),
               ),
@@ -543,7 +566,9 @@ class _FundraiserWidget extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
-              onPressed: () {},
+              onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Оплата будет доступна после подключения платёжного сервиса')),
+              ),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

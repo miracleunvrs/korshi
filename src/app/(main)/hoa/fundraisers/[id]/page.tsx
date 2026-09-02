@@ -1,53 +1,80 @@
 "use client";
 
-import { useState, use } from "react";
+import { useState, use, useEffect } from "react";
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, QrCode, X, Heart, ShieldCheck, Share2 } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
+import { createClient } from "@/lib/supabase/client";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 export default function FundraiserDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { donateToFundraiser, currentUser, posts } = useAppStore();
-  const fundraiserPost = posts.find((post) => post.fundraiser?.id === id) || posts.find((post) => post.type === "fundraiser");
+  const { donateToFundraiser, posts } = useAppStore();
+  const fundraiserPost = posts.find((post) => post.fundraiser?.id === id);
   const fundraiser = fundraiserPost?.fundraiser;
   const fundraiserId = fundraiser?.id || id;
-  const currentAmount = fundraiser?.current_amount ?? 1250000;
-  const targetAmount = fundraiser?.target_amount ?? 2000000;
-  const progress = Math.min(100, (currentAmount / targetAmount) * 100);
+  const currentAmount = fundraiser?.current_amount ?? 0;
+  const targetAmount = fundraiser?.target_amount ?? 0;
+  const progress = Math.min(100, targetAmount > 0 ? (currentAmount / targetAmount) * 100 : 0);
+  const remainingDays = fundraiser?.ends_at
+    ? Math.max(0, Math.ceil((new Date(fundraiser.ends_at).getTime() - Date.now()) / 86_400_000))
+    : null;
 
   const [isDonateModalOpen, setIsDonateModalOpen] = useState(false);
   const [donateAmount, setDonateAmount] = useState("5000");
   const [isPaid, setIsPaid] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
-  const [payments, setPayments] = useState([
-    { id: "1", name: "Мария Иванова", date: "15 мая 2026", amount: 5000, status: "Оплачено" },
-    { id: "2", name: "Алексей Петров", date: "14 мая 2026", amount: 10000, status: "Оплачено" },
-    { id: "3", name: "Кайрат Нурланов", date: "12 мая 2026", amount: 25000, status: "Оплачено" },
-    { id: "4", name: "Анонимный житель", date: "10 мая 2026", amount: 15000, status: "Оплачено" },
-  ]);
+  const [payments, setPayments] = useState<Array<{ id: string; name: string; date: string; amount: number; status: string }>>([]);
 
-  const handleDonate = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (!isSupabaseConfigured() || !fundraiser) return;
+    void (async () => {
+      const { data, error } = await (createClient() as any)
+        .from("fundraiser_payments")
+        .select("id, amount, confirmed_at, is_anonymous, user:profiles(full_name)")
+        .eq("fundraiser_id", fundraiser.id)
+        .order("confirmed_at", { ascending: false });
+      if (error) return;
+      setPayments((data || []).map((payment: any) => ({
+        id: payment.id,
+        name: payment.is_anonymous ? "Анонимный житель" : payment.user?.full_name || "Житель ЖК",
+        date: new Date(payment.confirmed_at).toLocaleDateString("ru-RU"),
+        amount: Number(payment.amount),
+        status: "Оплачено",
+      })));
+    })();
+  }, [fundraiser]);
+
+  if (!fundraiserPost || !fundraiser) {
+    return (
+      <div className="min-h-screen bg-white p-6 flex flex-col items-center justify-center text-center gap-4">
+        <p className="text-sm font-semibold text-gray-600">Сбор не найден</p>
+        <Link href="/hoa" className="text-sm font-bold text-green-700">Вернуться назад</Link>
+      </div>
+    );
+  }
+
+  const handleDonate = async (e: React.FormEvent) => {
     e.preventDefault();
     const sum = parseInt(donateAmount) || 0;
     if (sum <= 0) return;
 
-    donateToFundraiser(fundraiserId, sum);
-    setPayments([
-      {
-        id: Date.now().toString(),
-        name: currentUser.fullName,
-        date: "Только что",
-        amount: sum,
-        status: "Оплачено",
-      },
-      ...payments,
-    ]);
-
-    setIsPaid(true);
-    setTimeout(() => {
-      setIsPaid(false);
-      setIsDonateModalOpen(false);
-    }, 1500);
+    setIsSubmitting(true);
+    setPaymentError(null);
+    try {
+      await donateToFundraiser(fundraiserId, sum);
+      setIsPaid(true);
+      setTimeout(() => {
+        setIsPaid(false);
+        setIsDonateModalOpen(false);
+      }, 1500);
+    } catch (error) {
+      setPaymentError(error instanceof Error ? error.message : "Не удалось сохранить платёж");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -73,7 +100,7 @@ export default function FundraiserDetailPage({ params }: { params: Promise<{ id:
               Активный сбор
             </span>
             <span className="px-2.5 py-0.5 bg-green-50 text-green-700 rounded-full font-bold text-[11px]">
-              Осталось 12 дней
+              {remainingDays === null ? "Срок не указан" : `Осталось ${remainingDays} дн.`}
             </span>
           </div>
 
@@ -107,7 +134,7 @@ export default function FundraiserDetailPage({ params }: { params: Promise<{ id:
             О сборе
           </h3>
           <p className="text-xs text-gray-700 leading-relaxed">
-            Собираем средства на комплексное благоустройство двора: безопасное каучуковое покрытие детской площадки, озеленение (высадка 25 деревьев и кустарников) и установку 8 энергосберегающих парковых фонарей.
+            {fundraiserPost?.content || "Описание сбора пока не добавлено."}
           </p>
         </div>
 
@@ -116,20 +143,17 @@ export default function FundraiserDetailPage({ params }: { params: Promise<{ id:
           <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
             Отчёты по сбору
           </h3>
-          <p className="text-[11px] text-gray-400">Последний отчёт 15 мая</p>
+          <p className="text-[11px] text-gray-400">Документы и отчёты появятся здесь после публикации.</p>
 
-          <div className="grid grid-cols-2 gap-2">
-            <img
-              src="https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=400&auto=format&fit=crop&q=80"
-              alt="План"
-              className="w-full h-28 rounded-2xl object-cover ring-1 ring-black/5"
-            />
-            <img
-              src="https://images.unsplash.com/photo-1588880331179-bc9b93a8cb5e?w=400&auto=format&fit=crop&q=80"
-              alt="План 2"
-              className="w-full h-28 rounded-2xl object-cover ring-1 ring-black/5"
-            />
-          </div>
+          {fundraiserPost?.attachments?.length ? (
+            <div className="grid grid-cols-2 gap-2">
+              {fundraiserPost.attachments.slice(0, 2).map((attachment) => (
+                <img key={attachment.id} src={attachment.url} alt="Документ по сбору" className="w-full h-28 rounded-2xl object-cover ring-1 ring-black/5" />
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-6 text-center text-xs text-gray-400">Файлы ещё не прикреплены</div>
+          )}
         </div>
 
         {/* История платежей */}
@@ -165,13 +189,14 @@ export default function FundraiserDetailPage({ params }: { params: Promise<{ id:
         </div>
       </div>
 
-      {/* Фиксированная кнопка «Внести свой вклад» */}
+      {/* Платежи пока не подключаем: сбор и история доступны для просмотра. */}
       <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-4 bg-white/95 backdrop-blur-xl border-t border-gray-100">
         <button
-          onClick={() => setIsDonateModalOpen(true)}
-          className="w-full py-3.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-bold text-sm rounded-2xl shadow-lg shadow-green-600/30 active:scale-95 transition"
+          type="button"
+          disabled
+          className="w-full py-3.5 bg-gray-100 text-gray-500 font-bold text-sm rounded-2xl cursor-not-allowed"
         >
-          Внести свой вклад
+          Оплата будет подключена позже
         </button>
       </div>
 
@@ -228,7 +253,8 @@ export default function FundraiserDetailPage({ params }: { params: Promise<{ id:
                   />
                 </div>
 
-                {/* Kaspi QR заглушка */}
+                {paymentError && <p className="rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{paymentError}</p>}
+                {/* Внешний платёжный провайдер подключается отдельно; запись взноса проходит через защищённый RPC. */}
                 <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3">
                   <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center text-white shrink-0 font-black text-xs">
                     Kaspi
@@ -241,9 +267,10 @@ export default function FundraiserDetailPage({ params }: { params: Promise<{ id:
 
                 <button
                   type="submit"
+                  disabled={isSubmitting || !fundraiser}
                   className="w-full py-3.5 bg-green-600 hover:bg-green-700 text-white font-bold text-sm rounded-xl shadow-md transition"
                 >
-                  Оплатить {parseInt(donateAmount || "0").toLocaleString("ru-RU")} ₸
+                  {isSubmitting ? "Сохраняем…" : `Оплатить ${parseInt(donateAmount || "0").toLocaleString("ru-RU")} ₸`}
                 </button>
               </form>
             )}

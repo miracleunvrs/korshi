@@ -1,4 +1,4 @@
-# HouseSM Mobile — UI Аудит (Flutter) vs Макеты/Веб-референс
+# Korshi Mobile — UI Аудит (Flutter) vs Макеты/Веб-референс
 
 Дата: 2026-08-25
 Ветка: main

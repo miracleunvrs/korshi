@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/data/house_repository.dart';
+import '../../../core/supabase/supabase_config.dart';
 import '../../../core/theme/app_colors.dart';
 
 class ChatRoomScreen extends StatefulWidget {
@@ -11,39 +14,69 @@ class ChatRoomScreen extends StatefulWidget {
 }
 
 class _ChatRoomScreenState extends State<ChatRoomScreen> {
+  final repository = HouseRepository();
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
-  final List<Map<String, dynamic>> messages = [
-    {
-      'text': 'Добрый вечер, соседи! Лифт работает?',
-      'isMe': false,
-      'time': '19:30',
-      'sender': 'Алексей Петров',
-      'isOfficial': false,
-    },
-    {
-      'text': 'Здравствуйте! Да, мастера закончили наладку.',
-      'isMe': false,
-      'time': '19:35',
-      'sender': 'ОСИ «Солнечный»',
-      'isOfficial': true,
-    },
-    {
-      'text': 'Спасибо за оперативность!',
-      'isMe': true,
-      'time': '19:40',
-      'sender': 'Вы',
-      'isOfficial': false,
-    },
-  ];
+  final List<Map<String, dynamic>> messages = [];
+  RealtimeChannel? _syncChannel;
 
-  void _send() {
+  @override
+  void initState() {
+    super.initState();
+    _loadMessages();
+    if (repository.isConfigured) {
+      _syncChannel = Supabase.instance.client
+          .channel('housesm-mobile-chat-${widget.chatId}')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'messages',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'chat_id',
+              value: widget.chatId,
+            ),
+            callback: (_) => _loadMessages(),
+          )
+          .subscribe();
+    }
+  }
+
+  Future<void> _loadMessages() async {
+    if (!repository.isConfigured) return;
+    try {
+      final rows = await repository.loadMessages(widget.chatId);
+      if (!mounted) return;
+      final userId = repository.isConfigured ? SupabaseConfig.client.auth.currentUser?.id : null;
+      setState(() {
+        messages
+          ..clear()
+          ..addAll(rows.map((row) {
+            final sender = row['sender'] is List
+                ? ((row['sender'] as List).isEmpty ? null : (row['sender'] as List).first)
+                : row['sender'];
+            return {
+              'text': row['is_deleted'] == true ? 'Сообщение удалено' : row['content'] ?? '',
+              'isMe': row['sender_id'] == userId,
+              'time': '${row['created_at']}'.substring(11, 16),
+              'sender': sender is Map ? sender['full_name'] ?? 'Сосед' : 'Сосед',
+              'isOfficial': sender is Map && sender['role'] == 'hoa_official',
+            };
+          }));
+      });
+    } catch (_) {
+      // Keep the local preview if the chat is not available yet.
+    }
+  }
+
+  Future<void> _send() async {
     if (_controller.text.trim().isEmpty) return;
+    final text = _controller.text.trim();
     final now = TimeOfDay.now();
     final time = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
     setState(() {
       messages.add({
-        'text': _controller.text.trim(),
+        'text': text,
         'isMe': true,
         'time': time,
         'sender': 'Вы',
@@ -51,6 +84,20 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       });
       _controller.clear();
     });
+    if (repository.isConfigured) {
+      final user = repository.isConfigured ? SupabaseConfig.client.auth.currentUser : null;
+      if (user != null) {
+        try {
+      await repository.sendMessage(widget.chatId, text);
+        } catch (_) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Не удалось сохранить сообщение')),
+            );
+          }
+        }
+      }
+    }
     Future.delayed(const Duration(milliseconds: 100), () {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
@@ -64,6 +111,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
   @override
   void dispose() {
+    if (_syncChannel != null) Supabase.instance.client.removeChannel(_syncChannel!);
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -112,7 +160,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.more_vert, size: 20, color: Color(0xFF94A3B8)),
-            onPressed: () {},
+            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Настройки чата пока недоступны')),
+            ),
           ),
         ],
         bottom: PreferredSize(
@@ -243,7 +293,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
               children: [
                 IconButton(
                   icon: const Icon(Icons.add_circle_outline, size: 22, color: Color(0xFF94A3B8)),
-                  onPressed: () {},
+                  onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Вложения пока недоступны')),
+                  ),
                   visualDensity: VisualDensity.compact,
                 ),
                 Expanded(

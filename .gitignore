@@ -2,9 +2,11 @@ node_modules/
 .next/
 out/
 supabase/.temp/
+strix_runs/
 
 .env*
 !.env.example
+!.env.strix.example
 
 *.tsbuildinfo
 npm-debug.log*

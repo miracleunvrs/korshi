@@ -12,6 +12,7 @@ export default function ChatsPage() {
 
   const filteredChats = chats.filter((chat) => {
     if (activeTab === "unread" && chat.unreadCount === 0) return false;
+    if (activeTab === "my" && chat.type !== "direct") return false;
     if (searchQuery && !chat.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     return true;
   });

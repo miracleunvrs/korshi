@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../features/feed/presentation/feed_screen.dart';
 import '../features/chats/presentation/chats_list_screen.dart';
@@ -9,10 +12,40 @@ import '../features/hoa/presentation/hoa_screen.dart';
 import '../features/classifieds/presentation/classifieds_screen.dart';
 import '../features/profile/presentation/profile_screen.dart';
 import '../features/auth/presentation/login_screen.dart';
+import '../core/supabase/supabase_config.dart';
+
+class _AuthRefreshNotifier extends ChangeNotifier {
+  late final StreamSubscription<AuthState> _subscription;
+
+  _AuthRefreshNotifier() {
+    if (!SupabaseConfig.isPlaceholder) {
+      _subscription = SupabaseConfig.client.auth.onAuthStateChange.listen((_) => notifyListeners());
+    }
+  }
+
+  @override
+  void dispose() {
+    if (!SupabaseConfig.isPlaceholder) _subscription.cancel();
+    super.dispose();
+  }
+}
 
 final appRouterProvider = Provider<GoRouter>((ref) {
+  final authRefresh = _AuthRefreshNotifier();
+  ref.onDispose(authRefresh.dispose);
   return GoRouter(
-    initialLocation: '/feed',
+    refreshListenable: authRefresh,
+    initialLocation: SupabaseConfig.isPlaceholder || SupabaseConfig.client.auth.currentSession != null
+        ? '/feed'
+        : '/login',
+    redirect: (context, state) {
+      if (SupabaseConfig.isPlaceholder) return null;
+      final loggedIn = SupabaseConfig.client.auth.currentSession != null;
+      final onLogin = state.matchedLocation == '/login';
+      if (!loggedIn && !onLogin) return '/login';
+      if (loggedIn && onLogin) return '/feed';
+      return null;
+    },
     routes: [
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       StatefulShellRoute.indexedStack(

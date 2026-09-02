@@ -4,21 +4,21 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class SupabaseConfig {
   static const String supabaseUrl = String.fromEnvironment(
     'SUPABASE_URL',
-    defaultValue: 'https://placeholder.supabase.co',
+    defaultValue: '',
   );
 
   static const String supabaseAnonKey = String.fromEnvironment(
     'SUPABASE_ANON_KEY',
-    defaultValue: 'placeholder-anon-key',
+    defaultValue: '',
   );
 
   static bool get isPlaceholder =>
+      supabaseUrl.isEmpty || supabaseAnonKey.isEmpty ||
       supabaseUrl.contains('placeholder') || supabaseAnonKey.contains('placeholder');
 
   static Future<void> initialize() async {
     if (isPlaceholder) {
-      // Демо-режим как в вебе `src/app/page.tsx` — не инициализируем Supabase, используем мок-данные
-      return;
+      throw StateError('Flutter не настроен: передайте SUPABASE_URL и SUPABASE_ANON_KEY');
     }
     await Supabase.initialize(
       url: supabaseUrl,

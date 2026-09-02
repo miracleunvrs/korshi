@@ -10,6 +10,7 @@ import {
   deleteComment as deleteCommentRemote,
   deleteMessage as deleteMessageRemote,
   deletePost as deletePostRemote,
+  createDirectChat as createDirectChatRemote,
   hydrateDomainData,
   persistClassified,
   persistComment,
@@ -37,6 +38,9 @@ export interface UserAccount {
   role: UserRole;
   roleLabel: string;
   buildingNumber: string;
+  complexId?: string;
+  buildingId?: string;
+  entranceId?: string;
   entranceNumber: number;
   apartmentNumber: string;
   verified: boolean;
@@ -80,6 +84,15 @@ export interface VerificationRequest {
   documentUrl: string;
   status: "pending" | "approved" | "rejected";
   submittedAt: string;
+}
+
+export interface AppNotification {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  isRead: boolean;
+  createdAt: string;
 }
 
 export interface ClassifiedItem {
@@ -168,9 +181,6 @@ export const DEFAULT_ACCOUNTS: UserAccount[] = [
     bio: "Модерация социальной сети и верификация жителей.",
   },
 ];
-
-// Сохраняем старое имя экспорта для демо-компонентов.
-export const TEST_ACCOUNTS = DEFAULT_ACCOUNTS;
 
 export interface RegistrationResult {
   account: UserAccount;
@@ -313,12 +323,13 @@ export interface AppState {
   resetPassword: (email: string) => Promise<void>;
   logoutUser: () => Promise<void>;
   syncAuthState: () => Promise<void>;
-  switchAccount: (userId: string) => void;
   setVerified: (verified: boolean) => void;
   updateUser: (data: Partial<UserAccount>) => void;
   backendError: string | null;
   clearBackendError: () => void;
   hydrateDomainData: () => Promise<void>;
+  notifications: AppNotification[];
+  markNotificationRead: (notificationId: string) => Promise<void>;
 
   // Экстренные оповещения ОСИ
   urgentAlert: {
@@ -354,7 +365,7 @@ export interface AppState {
   messages: Record<string, MessageItem[]>;
   sendMessage: (chatId: string, text: string) => void;
   deleteMessage: (chatId: string, messageId: string) => void;
-  createDirectChatWith: (authorName: string) => string;
+  createDirectChatWith: (authorId: string, authorName: string) => Promise<string>;
 
   // Объявления
   classifieds: ClassifiedItem[];
@@ -362,7 +373,7 @@ export interface AppState {
   deleteClassified: (itemId: string) => void;
 
   // Сборы
-  donateToFundraiser: (fundraiserId: string, amount: number) => void;
+  donateToFundraiser: (fundraiserId: string, amount: number) => Promise<void>;
   createFundraiser: (data: {
     title: string;
     content: string;
@@ -382,6 +393,19 @@ export const useAppStore = create<AppState>()(
       isAuthLoading: isSupabaseConfigured(),
       supabaseUserId: null,
       backendError: null,
+      notifications: [],
+
+      markNotificationRead: async (notificationId) => {
+        if (isSupabaseConfigured()) {
+          const { error } = await (createClient() as any).from("notifications").update({ is_read: true }).eq("id", notificationId);
+          if (error) throw error;
+        }
+        set((state) => ({
+          notifications: state.notifications.map((notification) =>
+            notification.id === notificationId ? { ...notification, isRead: true } : notification
+          ),
+        }));
+      },
 
       clearBackendError: () => set({ backendError: null }),
 
@@ -397,6 +421,7 @@ export const useAppStore = create<AppState>()(
             classifieds: data.classifieds,
             verificationRequests: data.verificationRequests,
             postComments: data.postComments,
+            notifications: data.notifications,
             backendError: null,
           });
         } catch (error) {
@@ -445,9 +470,6 @@ export const useAppStore = create<AppState>()(
       },
 
       registerUser: async (data) => {
-        const state = get();
-        const newId = `user-${Date.now()}`;
-
         if (isSupabaseConfigured()) {
           const supabase = createClient();
           const { data: authData, error } = await supabase.auth.signUp({
@@ -487,47 +509,10 @@ export const useAppStore = create<AppState>()(
           return { account, requiresEmailConfirmation };
         }
 
-        const newUser: UserAccount = {
-          id: newId,
-          fullName: data.fullName,
-          phone: data.phone,
-          email: data.email || undefined,
-          role: data.role || "resident",
-          roleLabel: roleLabel(data.role || "resident", data.buildingNumber),
-          buildingNumber: data.buildingNumber,
-          entranceNumber: data.entranceNumber,
-          apartmentNumber: data.apartmentNumber,
-          verified: false,
-          avatarUrl: "",
-        };
-
-        const newReq: VerificationRequest = {
-          id: `req-${Date.now()}`,
-          userId: newId,
-          fullName: data.fullName,
-          phone: data.phone,
-          buildingNumber: data.buildingNumber,
-          entranceNumber: data.entranceNumber,
-          apartmentNumber: data.apartmentNumber,
-          documentType: "Загружен при регистрации",
-          documentUrl: "https://images.unsplash.com/photo-1568602471122-7832951cc4c5?w=600&auto=format&fit=crop&q=80",
-          status: "pending",
-          submittedAt: "Только что",
-        };
-
-        set((s) => ({
-          registeredUsers: [newUser, ...s.registeredUsers],
-          currentUser: newUser,
-          isLoggedIn: true,
-          verificationRequests: [newReq, ...s.verificationRequests],
-        }));
-
-        return { account: newUser, requiresEmailConfirmation: false };
+        throw new Error("Supabase не настроен. Укажите переменные окружения для реальной регистрации.");
       },
 
       loginUser: async (email, password) => {
-        const state = get();
-
         if (isSupabaseConfigured()) {
           const supabase = createClient();
           const { data, error } = await supabase.auth.signInWithPassword({
@@ -551,13 +536,7 @@ export const useAppStore = create<AppState>()(
           return account;
         }
 
-        const found = state.registeredUsers.find(
-          (user) => user.email?.toLowerCase() === email.trim().toLowerCase()
-        );
-        if (!found) throw new Error("Демо-пользователь с таким email не найден");
-        const user = found;
-        set({ currentUser: user, isLoggedIn: true });
-        return user;
+        throw new Error("Supabase не настроен. Укажите переменные окружения для реального входа.");
       },
 
       resetPassword: async (email) => {
@@ -579,13 +558,6 @@ export const useAppStore = create<AppState>()(
           isLoggedIn: false,
           supabaseUserId: null,
         });
-      },
-
-      switchAccount: (userId) => {
-        const target = get().registeredUsers.find((a) => a.id === userId);
-        if (target) {
-          set({ currentUser: target, isLoggedIn: true });
-        }
       },
 
       setVerified: (verified) =>
@@ -634,8 +606,16 @@ export const useAppStore = create<AppState>()(
 
       approveVerification: (requestId) =>
         set((state) => {
+          const previousRequests = state.verificationRequests;
+          const previousUsers = state.registeredUsers;
+          const previousCurrentUser = state.currentUser;
           void reviewVerificationRequest(requestId, true).catch((error) => {
-            set({ backendError: error instanceof Error ? error.message : "Не удалось подтвердить жителя" });
+            set({
+              verificationRequests: previousRequests,
+              registeredUsers: previousUsers,
+              currentUser: previousCurrentUser,
+              backendError: error instanceof Error ? error.message : "Не удалось подтвердить жителя",
+            });
           });
           const req = state.verificationRequests.find((r) => r.id === requestId);
           const updatedRequests = state.verificationRequests.map((r) =>
@@ -658,8 +638,12 @@ export const useAppStore = create<AppState>()(
 
       rejectVerification: (requestId) =>
         set((state) => {
+          const previousRequests = state.verificationRequests;
           void reviewVerificationRequest(requestId, false).catch((error) => {
-            set({ backendError: error instanceof Error ? error.message : "Не удалось отклонить заявку" });
+            set({
+              verificationRequests: previousRequests,
+              backendError: error instanceof Error ? error.message : "Не удалось отклонить заявку",
+            });
           });
           return {
             verificationRequests: state.verificationRequests.map((r) =>
@@ -848,8 +832,12 @@ export const useAppStore = create<AppState>()(
           const savedPost = isSupabaseConfigured() && !isUuid(post.id)
             ? { ...post, id: crypto.randomUUID() }
             : post;
+          const previousPosts = state.posts;
           void persistPost(savedPost).catch((error) => {
-            set({ backendError: error instanceof Error ? error.message : "Не удалось сохранить публикацию" });
+            set({
+              posts: previousPosts,
+              backendError: error instanceof Error ? error.message : "Не удалось сохранить публикацию",
+            });
           });
           return { posts: [savedPost, ...state.posts], backendError: null };
         }),
@@ -864,8 +852,12 @@ export const useAppStore = create<AppState>()(
 
       likePost: (postId) =>
         set((state) => {
+          const previousPosts = state.posts;
           void persistReaction(postId).catch((error) => {
-            set({ backendError: error instanceof Error ? error.message : "Не удалось сохранить реакцию" });
+            set({
+              posts: previousPosts,
+              backendError: error instanceof Error ? error.message : "Не удалось сохранить реакцию",
+            });
           });
           return {
             posts: state.posts.map((p) =>
@@ -878,8 +870,12 @@ export const useAppStore = create<AppState>()(
 
       unlikePost: (postId) =>
         set((state) => {
+          const previousPosts = state.posts;
           void removeReaction(postId).catch((error) => {
-            set({ backendError: error instanceof Error ? error.message : "Не удалось убрать реакцию" });
+            set({
+              posts: previousPosts,
+              backendError: error instanceof Error ? error.message : "Не удалось убрать реакцию",
+            });
           });
           return {
             posts: state.posts.map((p) =>
@@ -892,8 +888,12 @@ export const useAppStore = create<AppState>()(
 
       votePoll: (postId, optionId) =>
         set((state) => {
+          const previousPosts = state.posts;
           void persistPollVote(postId, optionId).catch((error) => {
-            set({ backendError: error instanceof Error ? error.message : "Не удалось сохранить голос" });
+            set({
+              posts: previousPosts,
+              backendError: error instanceof Error ? error.message : "Не удалось сохранить голос",
+            });
           });
           return {
           posts: state.posts.map((p) => {
@@ -1091,6 +1091,8 @@ export const useAppStore = create<AppState>()(
 
       sendMessage: (chatId, text) =>
         set((state) => {
+          const previousMessages = state.messages;
+          const previousChats = state.chats;
           const currentMsgs = state.messages[chatId] || [];
           const now = new Date();
           const timeStr = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -1105,7 +1107,11 @@ export const useAppStore = create<AppState>()(
           };
 
           void persistMessage(chatId, text).catch((error) => {
-            set({ backendError: error instanceof Error ? error.message : "Не удалось отправить сообщение" });
+            set({
+              messages: previousMessages,
+              chats: previousChats,
+              backendError: error instanceof Error ? error.message : "Не удалось отправить сообщение",
+            });
           });
 
           return {
@@ -1140,8 +1146,14 @@ export const useAppStore = create<AppState>()(
           };
         }),
 
-      createDirectChatWith: (authorName) => {
+      createDirectChatWith: async (authorId, authorName) => {
         const state = get();
+        if (isSupabaseConfigured()) {
+          const chatId = await createDirectChatRemote(authorId);
+          await get().hydrateDomainData();
+          return chatId;
+        }
+
         const existingChat = state.chats.find((c) => c.name.includes(authorName));
         if (existingChat) return existingChat.id;
 
@@ -1255,12 +1267,9 @@ export const useAppStore = create<AppState>()(
           return { classifieds: state.classifieds.filter((item) => item.id !== itemId) };
         }),
 
-      donateToFundraiser: (fundraiserId, amount) =>
-        set((state) => {
-          void recordFundraiserPayment(fundraiserId, amount).catch((error) => {
-            set({ backendError: error instanceof Error ? error.message : "Не удалось сохранить платёж" });
-          });
-          return {
+      donateToFundraiser: async (fundraiserId, amount) => {
+        await recordFundraiserPayment(fundraiserId, amount);
+        set((state) => ({
           posts: state.posts.map((p) => {
             if (p.fundraiser?.id !== fundraiserId) return p;
             return {
@@ -1271,8 +1280,8 @@ export const useAppStore = create<AppState>()(
               },
             };
           }),
-          };
-        }),
+        }));
+      },
 
       createFundraiser: (data) =>
         set((state) => {

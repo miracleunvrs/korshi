@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'app_colors.dart';
 
-/// Типографика HouseSM — Inter, как в вебе `layout.tsx: Inter({ subsets: ["latin","cyrillic"]})`
+/// Типографика Korshi — Inter, как в вебе `layout.tsx: Inter({ subsets: ["latin","cyrillic"]})`
 /// Размеры выровнены с веб `text-[10px]..text-lg` + Tailwind scale.
 class AppTypography {
   static TextTheme lightTextTheme =

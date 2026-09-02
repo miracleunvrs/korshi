@@ -1,6 +1,6 @@
 {
-  "name": "HouseSM — Сообщество вашего ЖК",
-  "short_name": "HouseSM",
+  "name": "Korshi — Сообщество вашего ЖК",
+  "short_name": "Korshi",
   "description": "Единая цифровая среда жилого комплекса",
   "start_url": "/feed",
   "display": "standalone",

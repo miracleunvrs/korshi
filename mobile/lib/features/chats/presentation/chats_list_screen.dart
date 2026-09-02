@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/data/house_repository.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/loading_skeleton.dart';
@@ -15,71 +17,61 @@ class _ChatsListScreenState extends State<ChatsListScreen> {
   String activeTab = 'all';
   String searchQuery = '';
   bool isLoading = false;
-
-  final chats = [
-    {
-      'id': '1',
-      'name': 'Чат дома 1',
-      'msg': 'Алексей: Лифт починили?',
-      'time': '19:45',
-      'unread': 3,
-      'icon': '🏢',
-      'color': const Color(0xFF2563EB),
-    },
-    {
-      'id': '2',
-      'name': 'Чат подъезда 1',
-      'msg': 'Ирина: Спасибо за мастера!',
-      'time': '18:30',
-      'unread': 0,
-      'icon': '🚪',
-      'color': const Color(0xFF059669),
-    },
-    {
-      'id': '3',
-      'name': 'Благоустройство двора',
-      'msg': 'Олег: Прикрепил смету',
-      'time': '16:12',
-      'unread': 5,
-      'icon': '🌳',
-      'color': const Color(0xFFD97706),
-    },
-    {
-      'id': '4',
-      'name': 'Родители ЖК',
-      'msg': 'Анна: Кто на площадку?',
-      'time': '15:45',
-      'unread': 0,
-      'icon': '🧸',
-      'color': const Color(0xFFE11D48),
-    },
-    {
-      'id': '5',
-      'name': 'Сергей',
-      'msg': 'Хорошо, договорились на 18:00',
-      'time': '14:20',
-      'unread': 1,
-      'icon': '👤',
-      'color': const Color(0xFF7C3AED),
-    },
-  ];
+  List<Map<String, dynamic>>? remoteChats;
+  final repository = HouseRepository();
+  RealtimeChannel? _syncChannel;
 
   @override
   void initState() {
     super.initState();
     _load();
+    if (repository.isConfigured) {
+      _syncChannel = Supabase.instance.client
+          .channel('housesm-mobile-chats-sync')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'chats',
+            callback: (_) => _load(),
+          )
+          .subscribe();
+    }
+  }
+
+  @override
+  void dispose() {
+    if (_syncChannel != null) Supabase.instance.client.removeChannel(_syncChannel!);
+    super.dispose();
   }
 
   Future<void> _load() async {
     setState(() => isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 500));
+    if (repository.isConfigured) {
+      try {
+        final rows = await repository.loadChats();
+        if (mounted) setState(() => remoteChats = rows);
+      } catch (_) {
+        // Keep the demo list visible if the backend is temporarily unavailable.
+      }
+    } else {
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
     if (mounted) setState(() => isLoading = false);
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final filtered = chats.where((c) {
+    final source = remoteChats ?? <Map<String, dynamic>>[];
+    final normalized = source.map((c) => {
+          ...c,
+          'msg': c['msg'] ?? '',
+          'time': c['time'] ?? '',
+          'unread': c['unread'] ?? 0,
+          'icon': c['icon'] ?? '💬',
+          'color': c['color'] ?? const Color(0xFF16A34A),
+        });
+    final filtered = normalized.where((c) {
       if (activeTab == 'unread' && (c['unread'] as int) == 0) return false;
       if (searchQuery.isNotEmpty &&
           !(c['name'] as String).toLowerCase().contains(searchQuery.toLowerCase())) {
