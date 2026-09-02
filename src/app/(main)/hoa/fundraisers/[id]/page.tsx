@@ -10,6 +10,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 export default function FundraiserDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { donateToFundraiser, posts } = useAppStore();
+  const [renderedAt] = useState(() => Date.now());
   const fundraiserPost = posts.find((post) => post.fundraiser?.id === id);
   const fundraiser = fundraiserPost?.fundraiser;
   const fundraiserId = fundraiser?.id || id;
@@ -17,7 +18,7 @@ export default function FundraiserDetailPage({ params }: { params: Promise<{ id:
   const targetAmount = fundraiser?.target_amount ?? 0;
   const progress = Math.min(100, targetAmount > 0 ? (currentAmount / targetAmount) * 100 : 0);
   const remainingDays = fundraiser?.ends_at
-    ? Math.max(0, Math.ceil((new Date(fundraiser.ends_at).getTime() - Date.now()) / 86_400_000))
+    ? Math.max(0, Math.ceil((new Date(fundraiser.ends_at).getTime() - renderedAt) / 86_400_000))
     : null;
 
   const [isDonateModalOpen, setIsDonateModalOpen] = useState(false);
