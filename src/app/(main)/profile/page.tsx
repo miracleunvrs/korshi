@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import NextImage from "next/image";
 import { useRouter } from "next/navigation";
 import { 
   ShieldCheck, 
@@ -19,15 +20,19 @@ import {
   LogOut
 } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
+import { useOperationsStore } from "@/stores/operationsStore";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { complexName } from "@/lib/appConfig";
 
 export default function ProfilePage() {
   const router = useRouter();
   const { currentUser, updateUser, posts, logoutUser } = useAppStore();
+  const { memberships, switchMembership, inviteFamily, syncMessage } = useOperationsStore();
 
   const [activeTab, setActiveTab] = useState<"posts" | "announcements" | "payments" | "settings">("posts");
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [invitePhone, setInvitePhone] = useState("");
 
   // Edit form state
   const [editName, setEditName] = useState(currentUser.fullName);
@@ -62,9 +67,10 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="min-h-screen bg-white pb-12">
+    <div className="min-h-screen bg-[#fffefb] pb-12">
       {/* Обложка профиля (Cover Banner) */}
-      <div className="h-44 sm:h-52 bg-gradient-to-r from-emerald-600 via-green-600 to-teal-700 relative overflow-hidden">
+      <div className="relative h-44 overflow-hidden bg-[#173f2a] sm:h-52">
+        <div className="absolute -right-16 -top-20 h-64 w-64 rounded-full bg-violet-500/25 blur-3xl" />
         <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px]" />
         <div className="absolute top-4 right-4 flex gap-2">
           <button className="px-3 py-1.5 bg-black/30 hover:bg-black/50 backdrop-blur-md text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition">
@@ -77,9 +83,12 @@ export default function ProfilePage() {
       <div className="px-6 pb-6 relative">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 -mt-16 sm:-mt-20 mb-4">
           <div className="relative inline-block">
-            <img
+            <NextImage
               src={currentUser.avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80"}
               alt={currentUser.fullName}
+              width={128}
+              height={128}
+              unoptimized
               className="w-28 h-28 sm:w-32 sm:h-32 rounded-3xl object-cover ring-4 ring-white shadow-xl bg-white"
             />
             {currentUser.verified && (
@@ -122,7 +131,7 @@ export default function ProfilePage() {
           <div className="flex flex-wrap items-center gap-y-2 gap-x-4 text-xs font-medium text-gray-500">
             <span className="flex items-center gap-1.5 text-gray-700">
               <Building2 className="w-4 h-4 text-green-600" />
-              ЖК «Солнечный», Дом {currentUser.buildingNumber}, Подъезд {currentUser.entranceNumber}, кв. {currentUser.apartmentNumber}
+              ЖК «{complexName(currentUser.complexName)}», Дом {currentUser.buildingNumber}, Подъезд {currentUser.entranceNumber}, кв. {currentUser.apartmentNumber}
             </span>
             <span className="flex items-center gap-1.5">
               <Phone className="w-3.5 h-3.5 text-gray-400" />
@@ -231,6 +240,8 @@ export default function ProfilePage() {
 
           {activeTab === "settings" && (
             <div className="space-y-4 max-w-md">
+              <section className="rounded-3xl border border-stone-200 bg-white p-4"><div className="flex items-center gap-3"><Building2 className="h-5 w-5 text-green-800" /><div><p className="text-sm font-black text-stone-950">Мои объекты</p><p className="text-[10px] text-stone-500">Можно привязать несколько квартир и ЖК</p></div></div><div className="mt-3 space-y-2">{memberships.map((membership) => <button key={membership.id} onClick={() => switchMembership(membership.id)} className={`w-full rounded-2xl border p-3 text-left transition ${membership.isActive ? "border-green-300 bg-green-50" : "border-stone-200 bg-stone-50"}`}><span className="flex items-center justify-between gap-2"><span className="text-xs font-extrabold text-stone-900">ЖК «{membership.complexName}»</span>{membership.isActive && <span className="rounded-full bg-green-700 px-2 py-1 text-[9px] font-extrabold text-white">Активен</span>}</span><span className="mt-1 block text-[10px] text-stone-500">Дом {membership.building} · подъезд {membership.entrance} · кв. {membership.apartment} · {membership.role === "owner" ? "собственник" : "член семьи"}</span></button>)}</div></section>
+              <form onSubmit={(event) => { event.preventDefault(); if (invitePhone.trim()) { void inviteFamily(invitePhone.trim()); setInvitePhone(""); } }} className="rounded-3xl border border-violet-200 bg-violet-50 p-4"><p className="text-sm font-black text-violet-950">Пригласить члена семьи</p><p className="mt-1 text-[10px] leading-4 text-violet-700">Приглашённый получит роль только в выбранной квартире.</p><div className="mt-3 flex gap-2"><input type="tel" value={invitePhone} onChange={(event) => setInvitePhone(event.target.value)} placeholder="+7 777 000 00 00" className="min-h-11 min-w-0 flex-1 rounded-xl border border-violet-200 bg-white px-3 text-xs" /><button className="rounded-xl bg-violet-700 px-4 text-xs font-extrabold text-white">Пригласить</button></div>{syncMessage && <p className="mt-2 text-[10px] font-bold text-violet-800">{syncMessage}</p>}</form>
               <div className="flex items-center justify-between p-3.5 bg-gray-50 rounded-2xl">
                 <div>
                   <p className="font-bold text-xs text-gray-900">Уведомления ОСИ</p>

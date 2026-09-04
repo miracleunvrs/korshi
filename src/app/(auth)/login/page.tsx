@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ShieldCheck, ArrowRight, CheckCircle2 } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
+import { APP_CONFIG, complexTitle } from "@/lib/appConfig";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -106,18 +107,19 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#09090b] flex flex-col justify-center items-center p-4 sm:p-6 text-white selection:bg-green-500 selection:text-white">
-      <div className="w-full max-w-md bg-white text-gray-900 rounded-[36px] p-6 sm:p-8 shadow-2xl space-y-6">
+    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[#173f2a] p-4 text-white selection:bg-violet-500 selection:text-white sm:p-6">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(124,58,237,.24),transparent_32%),radial-gradient(circle_at_80%_90%,rgba(52,211,153,.17),transparent_35%)]" />
+      <div className="reveal-up relative w-full max-w-md space-y-6 rounded-[36px] bg-[#fffefb] p-6 text-stone-900 shadow-[0_32px_90px_rgba(0,0,0,.28)] sm:p-8">
         {/* Логотип */}
         <div className="text-center space-y-2">
-          <div className="w-14 h-14 rounded-3xl bg-gradient-to-tr from-green-600 to-emerald-500 flex items-center justify-center text-white font-black text-xl mx-auto shadow-lg shadow-green-600/30">
-            ЖК
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-violet-600 text-xl font-black text-white shadow-[0_12px_30px_rgba(124,58,237,.24)]">
+            K
           </div>
           <div className="flex items-center justify-center gap-1.5">
-            <h1 className="text-2xl font-black tracking-tight text-gray-900">ЖК «Солнечный»</h1>
-            <ShieldCheck className="w-5 h-5 text-green-600" />
+            <h1 className="text-2xl font-black tracking-tight text-stone-950">{APP_CONFIG.brandName}</h1>
+            <ShieldCheck className="h-5 w-5 text-green-800" />
           </div>
-          <p className="text-xs text-gray-500 font-medium">Закрытая цифровая среда для жителей дома</p>
+          <p className="text-sm font-semibold text-stone-500">{complexTitle()} · всё важное о вашем доме</p>
         </div>
 
         {/* Табы */}

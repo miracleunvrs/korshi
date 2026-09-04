@@ -1,7 +1,9 @@
 import Sidebar from "@/components/layout/Sidebar";
 import RightWidgetPanel from "@/components/layout/RightWidgetPanel";
 import BottomNav from "@/components/layout/BottomNav";
+import MobileTopBar from "@/components/layout/MobileTopBar";
 import BackendErrorBanner from "@/components/auth/BackendErrorBanner";
+import PlatformRuntime from "@/components/runtime/PlatformRuntime";
 
 export default function MainLayout({
   children,
@@ -9,23 +11,21 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-[#f4f5f8] text-gray-900">
+    <div className="min-h-screen overflow-x-clip bg-[#f8f7f2] text-stone-900">
+      <a href="#main-content" className="fixed left-4 top-4 z-[100] -translate-y-24 rounded-xl bg-green-900 px-4 py-3 text-sm font-bold text-white transition focus:translate-y-0">Перейти к содержанию</a>
       <BackendErrorBanner />
-      {/* Главный центрированный контейнер соцсети */}
-      <div className="max-w-7xl mx-auto flex justify-center min-h-screen">
-        {/* Левая колонка — Меню (как в ВК) */}
+      <PlatformRuntime />
+      <MobileTopBar />
+      <div className="mx-auto flex min-h-screen w-full max-w-[1480px] justify-center">
         <Sidebar />
 
-        {/* Центральная колонка — Контент */}
-        <main className="flex-1 max-w-2xl min-h-screen border-x border-gray-200/80 bg-white pb-20 md:pb-8">
+        <main id="main-content" className="min-h-screen min-w-0 flex-1 overflow-x-clip border-stone-200/80 bg-[#fffefb] pb-24 md:max-w-3xl md:border-x md:pb-8">
           {children}
         </main>
 
-        {/* Правая колонка — Виджеты ОСИ, сборы, опросы, контакты */}
         <RightWidgetPanel />
       </div>
 
-      {/* Мобильный таббар (только на экранах меньше md) */}
       <div className="md:hidden">
         <BottomNav />
       </div>

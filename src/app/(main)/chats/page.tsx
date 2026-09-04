@@ -2,13 +2,20 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Plus, Search, CheckCheck } from "lucide-react";
+import { Building2, DoorOpen, MessageCircle, Plus, Search, UserRound, Users } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 
 export default function ChatsPage() {
   const [activeTab, setActiveTab] = useState<"all" | "my" | "unread">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const { chats } = useAppStore();
+  const chatIcon = (type: (typeof chats)[number]["type"]) => {
+    if (type === "building") return Building2;
+    if (type === "entrance") return DoorOpen;
+    if (type === "direct") return UserRound;
+    if (type === "thematic") return Users;
+    return MessageCircle;
+  };
 
   const filteredChats = chats.filter((chat) => {
     if (activeTab === "unread" && chat.unreadCount === 0) return false;
@@ -18,9 +25,9 @@ export default function ChatsPage() {
   });
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-[#fffefb]">
       {/* Header */}
-      <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-gray-100 px-4 py-3 space-y-3">
+      <div className="glass-nav sticky top-16 z-20 space-y-3 border-b border-stone-200/80 px-4 py-4 md:top-0">
         <div className="flex items-center justify-between">
           <h1 className="font-bold text-gray-900 text-lg">Чаты</h1>
           <Link
@@ -79,13 +86,18 @@ export default function ChatsPage() {
             <Link
               key={chat.id}
               href={`/chats/${chat.id}`}
-              className="flex items-center gap-3.5 px-4 py-3.5 hover:bg-gray-50 active:bg-gray-100 transition"
+              className="flex min-h-[76px] items-center gap-3.5 px-4 py-3.5 transition hover:bg-stone-50 active:bg-stone-100"
             >
+              {(() => {
+                const Icon = chatIcon(chat.type);
+                return (
               <div
-                className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl shrink-0 shadow-xs ${chat.avatarColor} text-white`}
+                className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-green-50 text-green-800"
               >
-                {chat.icon}
+                <Icon className="h-5 w-5" aria-hidden="true" />
               </div>
+                );
+              })()}
 
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between">

@@ -26,7 +26,7 @@ class AppTheme {
       colorScheme: scheme,
       textTheme: AppTypography.lightTextTheme,
       appBarTheme: const AppBarTheme(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.backgroundLight,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
@@ -70,7 +70,7 @@ class AppTheme {
         side: BorderSide.none,
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.backgroundLight,
         surfaceTintColor: Colors.transparent,
         indicatorColor: Colors.transparent,
         elevation: 0,
@@ -116,7 +116,7 @@ class AppTheme {
       ),
       iconTheme: const IconThemeData(color: AppColors.textPrimaryLight),
       bottomSheetTheme: const BottomSheetThemeData(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.backgroundLight,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),

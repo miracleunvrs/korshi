@@ -12,6 +12,8 @@ import '../features/hoa/presentation/hoa_screen.dart';
 import '../features/classifieds/presentation/classifieds_screen.dart';
 import '../features/profile/presentation/profile_screen.dart';
 import '../features/auth/presentation/login_screen.dart';
+import '../features/create/presentation/create_post_screen.dart';
+import '../features/requests/presentation/service_requests_screen.dart';
 import '../core/supabase/supabase_config.dart';
 
 class _AuthRefreshNotifier extends ChangeNotifier {
@@ -48,6 +50,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     },
     routes: [
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      GoRoute(
+        path: '/create',
+        builder: (context, state) => CreatePostScreen(
+          initialType: state.uri.queryParameters['type'] ?? 'post',
+        ),
+      ),
+      GoRoute(
+        path: '/requests',
+        builder: (context, state) => const ServiceRequestsScreen(),
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
           return ScaffoldWithBottomNav(navigationShell: navigationShell);
@@ -95,6 +107,13 @@ class ScaffoldWithBottomNav extends StatelessWidget {
 
   const ScaffoldWithBottomNav({super.key, required this.navigationShell});
 
+  void _openCreate(BuildContext context, BuildContext sheetContext, String type) {
+    Navigator.pop(sheetContext);
+    Future<void>.delayed(Duration.zero, () {
+      if (context.mounted) context.push('/create?type=$type');
+    });
+  }
+
   void _onCreate(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
@@ -126,39 +145,44 @@ class ScaffoldWithBottomNav extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 const Text(
-                  'Создать публикацию',
+                  'Создать',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 16),
                 _CreateOption(
+                  icon: Icons.build_circle_outlined,
+                  label: 'Заявка в ОСИ',
+                  subtitle: 'Сообщить о проблеме в доме',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    Future<void>.delayed(Duration.zero, () {
+                      if (context.mounted) context.push('/requests');
+                    });
+                  },
+                ),
+                _CreateOption(
                   icon: Icons.article_outlined,
                   label: 'Публикация',
                   subtitle: 'Поделитесь новостью с соседями',
-                  onTap: () => Navigator.pop(ctx),
+                  onTap: () => _openCreate(context, ctx, 'post'),
                 ),
                 _CreateOption(
                   icon: Icons.campaign_outlined,
                   label: 'Объявление',
                   subtitle: 'Продажа, аренда, услуги',
-                  onTap: () => Navigator.pop(ctx),
+                  onTap: () => _openCreate(context, ctx, 'announcement'),
                 ),
                 _CreateOption(
                   icon: Icons.poll_outlined,
                   label: 'Опрос',
                   subtitle: 'Спросите мнение жителей',
-                  onTap: () => Navigator.pop(ctx),
+                  onTap: () => _openCreate(context, ctx, 'poll'),
                 ),
                 _CreateOption(
                   icon: Icons.lightbulb_outline,
                   label: 'Инициатива',
                   subtitle: 'Предложите улучшение',
-                  onTap: () => Navigator.pop(ctx),
-                ),
-                _CreateOption(
-                  icon: Icons.volunteer_activism_outlined,
-                  label: 'Сбор средств',
-                  subtitle: 'Организуйте сбор',
-                  onTap: () => Navigator.pop(ctx),
+                  onTap: () => _openCreate(context, ctx, 'initiative'),
                 ),
               ],
             ),

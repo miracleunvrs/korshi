@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import NextImage from "next/image";
 import { 
   Bell, 
   SlidersHorizontal, 
@@ -12,13 +13,15 @@ import {
   Sparkles,
   ShieldCheck,
   AlertTriangle,
-  X
+  CheckCircle2
 } from "lucide-react";
 import Link from "next/link";
 import PostCard from "@/components/feed/PostCard";
 import FeedFilterModal from "@/components/feed/FeedFilterModal";
 import { useAppStore } from "@/stores/appStore";
 import type { PostWithAuthor } from "@/types";
+import TodayOverview from "@/components/feed/TodayOverview";
+import { complexName } from "@/lib/appConfig";
 
 export default function FeedPage() {
   const [activeChip, setActiveChip] = useState("Весь ЖК");
@@ -26,12 +29,13 @@ export default function FeedPage() {
   const [selectedTerritory, setSelectedTerritory] = useState("all");
   const [selectedType, setSelectedType] = useState("all");
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(12);
 
   // Quick post creator state
   const [quickPostText, setQuickPostText] = useState("");
   const [quickPostType, setQuickPostType] = useState<"post" | "announcement" | "poll">("post");
 
-  const { posts, addPost, deletePost, likePost, unlikePost, votePoll, supportInitiative, currentUser, urgentAlert, setUrgentAlert, notifications, markNotificationRead } = useAppStore();
+  const { posts, addPost, deletePost, likePost, unlikePost, votePoll, supportInitiative, currentUser, urgentAlert, acknowledgeUrgentAlert, notifications, markNotificationRead } = useAppStore();
   const unreadNotifications = notifications.filter((notification) => !notification.isRead).length;
 
   const chips = ["Весь ЖК", "Мой дом", "Мой подъезд", "Официальное", "Объявления", "Опросы"];
@@ -97,27 +101,29 @@ export default function FeedPage() {
     setSelectedTerritory("all");
     setSelectedType("all");
     setActiveChip("Весь ЖК");
+    setVisibleCount(12);
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen min-w-0 bg-[#fffefb]">
+      <TodayOverview />
       {/* Шапка ленты */}
-      <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-gray-100 px-4 sm:px-6 py-3.5 space-y-3">
+      <div className="glass-nav sticky top-16 z-20 space-y-3 border-b border-stone-200/80 px-4 py-3.5 sm:px-6 md:top-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h1 className="font-extrabold text-gray-900 text-lg sm:text-xl">Новости ЖК</h1>
-            <span className="px-2 py-0.5 bg-green-50 text-green-700 text-xs font-bold rounded-full">
-              Солнечный
+            <h1 className="text-lg font-black tracking-[-0.02em] text-stone-950 sm:text-xl">Лента соседей</h1>
+            <span className="hidden rounded-full bg-green-50 px-2 py-0.5 text-xs font-bold text-green-800 min-[430px]:inline">
+              {complexName(currentUser.complexName)}
             </span>
           </div>
 
           <div className="flex items-center gap-1.5">
             <button
               onClick={() => setIsFilterModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold transition"
+              className="flex min-h-10 items-center gap-1.5 rounded-xl bg-stone-100 px-3 py-1.5 text-xs font-bold text-stone-700 transition hover:bg-stone-200"
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />
-              <span>Фильтры</span>
+              <span className="hidden min-[370px]:inline">Фильтры</span>
             </button>
             <button
               onClick={() => setNotificationsOpen((open) => !open)}
@@ -158,6 +164,9 @@ export default function FeedPage() {
                 </button>
               ))}
             </div>
+            <Link href="/notifications" className="flex min-h-11 items-center justify-center border-t border-stone-100 text-xs font-extrabold text-green-800 transition hover:bg-green-50">
+              Все уведомления и настройки
+            </Link>
           </div>
         )}
 
@@ -169,10 +178,10 @@ export default function FeedPage() {
               <button
                 key={chip}
                 onClick={() => setActiveChip(chip)}
-                className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold transition ${
+                className={`min-h-9 shrink-0 rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
                   isActive
-                    ? "bg-green-600 text-white shadow-sm shadow-green-600/30"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                    ? "bg-green-800 text-white shadow-sm"
+                    : "bg-stone-100 text-stone-600 hover:bg-stone-200 hover:text-stone-900"
                 }`}
               >
                 {chip}
@@ -184,82 +193,88 @@ export default function FeedPage() {
 
       {/* Экстренное оповещение ОСИ (Красная плашка) */}
       {urgentAlert?.active && (
-        <div className="m-4 p-4 bg-gradient-to-r from-red-500 to-rose-600 text-white rounded-3xl shadow-lg shadow-red-500/20 flex items-start justify-between gap-3 animate-in fade-in duration-300">
-          <div className="flex items-start gap-3">
+        <div className="reveal-up m-4 flex items-start justify-between gap-3 rounded-[24px] bg-rose-700 p-4 text-white shadow-[0_16px_38px_rgba(190,18,60,.18)] sm:m-5">
+          <div className="flex min-w-0 items-start gap-3">
             <div className="w-9 h-9 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
               <AlertTriangle className="w-5 h-5 text-white" />
             </div>
-            <div className="space-y-0.5">
+            <div className="min-w-0 space-y-0.5">
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black uppercase tracking-wider bg-white/30 px-2 py-0.5 rounded-full">
+                <span className="rounded-full bg-rose-950/40 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-white">
                   Срочно от ОСИ
                 </span>
-                <span className="text-[10px] opacity-80">{urgentAlert.createdAt}</span>
+                <span className="text-[10px] text-white">{urgentAlert.createdAt}</span>
               </div>
               <h3 className="font-extrabold text-sm leading-snug">{urgentAlert.title}</h3>
-              <p className="text-xs text-red-50 leading-relaxed pt-0.5">{urgentAlert.message}</p>
+              <p className="pt-0.5 text-xs leading-relaxed text-white">{urgentAlert.message}</p>
+              <Link href="/emergency" className="mt-2 inline-flex min-h-9 items-center rounded-xl bg-rose-950/40 px-3 text-[11px] font-extrabold text-white hover:bg-rose-950/55">Подробнее и контакты</Link>
             </div>
           </div>
           <button
-            onClick={() => setUrgentAlert(null)}
+            onClick={() => { void acknowledgeUrgentAlert().catch(() => undefined); }}
             className="text-white/80 hover:text-white p-1 hover:bg-white/10 rounded-full transition"
-            aria-label="Закрыть"
+            aria-label="Подтвердить ознакомление"
           >
-            <X className="w-4 h-4" />
+            <CheckCircle2 className="w-4 h-4" />
           </button>
         </div>
       )}
 
       {/* Быстрое создание записи (как в ВК) */}
-      <div className="p-4 sm:p-5 border-b border-gray-100 bg-white">
+      <div className="border-b border-stone-200/80 bg-[#fffefb] p-4 sm:p-5">
         <form onSubmit={handleQuickPostSubmit} className="space-y-3">
-          <div className="flex items-start gap-3">
-            <img
+          <div className="flex min-w-0 items-start gap-3">
+            <NextImage
               src={currentUser.avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80"}
               alt=""
-              className="w-10 h-10 rounded-xl object-cover ring-2 ring-gray-100 shrink-0"
+              width={40}
+              height={40}
+              unoptimized
+              className="h-10 w-10 shrink-0 rounded-xl object-cover ring-2 ring-stone-100"
             />
             <textarea
               rows={2}
               value={quickPostText}
               onChange={(e) => setQuickPostText(e.target.value)}
               placeholder={`Что нового в ЖК, ${currentUser.fullName.split(" ")[0]}? Поделитесь с соседями...`}
-              className="w-full bg-gray-50 hover:bg-gray-100/70 focus:bg-white border border-gray-200 rounded-2xl p-3 text-xs focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition resize-none"
+              className="min-w-0 flex-1 resize-none rounded-2xl border border-stone-200 bg-stone-50 p-3 text-sm outline-none transition hover:bg-stone-100/70 focus:border-green-700 focus:bg-white focus:ring-2 focus:ring-green-700/15"
             />
           </div>
 
-          <div className="flex items-center justify-between pt-1">
-            <div className="flex items-center gap-1.5">
+          <div className="flex min-w-0 items-center justify-between gap-2 pt-1">
+            <div className="flex min-w-0 items-center gap-0.5 sm:gap-1.5">
               <button
                 type="button"
                 onClick={() => setQuickPostType("post")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition ${
+                className={`flex min-h-10 items-center gap-1.5 rounded-xl px-2 py-1.5 text-xs font-semibold transition sm:px-3 ${
                   quickPostType === "post" ? "bg-green-50 text-green-700 font-bold" : "text-gray-500 hover:bg-gray-100"
                 }`}
               >
                 <ImageIcon className="w-3.5 h-3.5 text-green-600" />
-                <span>Фото</span>
+                <span className="hidden min-[360px]:inline">Фото</span>
               </button>
               <Link
                 href="/create"
-                className="px-3 py-1.5 rounded-xl text-xs font-semibold text-gray-500 hover:bg-gray-100 flex items-center gap-1.5 transition"
+                aria-label="Создать опрос"
+                className="flex min-h-10 items-center gap-1.5 rounded-xl px-2 py-1.5 text-xs font-semibold text-stone-500 transition hover:bg-stone-100 sm:px-3"
               >
                 <BarChart3 className="w-3.5 h-3.5 text-blue-600" />
-                <span>Опрос</span>
+                <span className="hidden min-[420px]:inline">Опрос</span>
               </Link>
               <Link
                 href="/create"
-                className="px-3 py-1.5 rounded-xl text-xs font-semibold text-gray-500 hover:bg-gray-100 flex items-center gap-1.5 transition"
+                aria-label="Создать инициативу"
+                className="flex min-h-10 items-center gap-1.5 rounded-xl px-2 py-1.5 text-xs font-semibold text-stone-500 transition hover:bg-stone-100 sm:px-3"
               >
                 <Lightbulb className="w-3.5 h-3.5 text-amber-600" />
-                <span>Инициатива</span>
+                <span className="hidden min-[520px]:inline">Инициатива</span>
               </Link>
             </div>
 
             <button
               type="submit"
               disabled={!quickPostText.trim()}
-              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-bold text-xs rounded-xl disabled:opacity-40 shadow-xs active:scale-95 transition flex items-center gap-1.5"
+              className="flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl bg-green-800 px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-green-900 active:scale-95 disabled:opacity-40 sm:px-4"
             >
               <Send className="w-3.5 h-3.5" />
               <span>Опубликовать</span>
@@ -281,17 +296,21 @@ export default function FeedPage() {
             </button>
           </div>
         ) : (
-          filteredPosts.map((post) => (
-            <PostCard
-              key={post.id}
-              post={post}
-              onVote={(pollId, optionId) => votePoll(post.id, optionId)}
-              onSupportInitiative={(initiativeId) => supportInitiative(initiativeId)}
-              onLike={likePost}
-              onUnlike={unlikePost}
-              onDelete={post.author_id === currentUser.id ? deletePost : undefined}
-            />
-          ))
+          <>
+            {filteredPosts.slice(0, visibleCount).map((post) => (
+              <div key={post.id} className="virtual-feed-item border-b border-stone-100 last:border-b-0">
+                <PostCard
+                  post={post}
+                  onVote={(pollId, optionId) => votePoll(post.id, optionId)}
+                  onSupportInitiative={(initiativeId) => supportInitiative(initiativeId)}
+                  onLike={likePost}
+                  onUnlike={unlikePost}
+                  onDelete={post.author_id === currentUser.id ? deletePost : undefined}
+                />
+              </div>
+            ))}
+            {visibleCount < filteredPosts.length && <div className="p-4"><button onClick={() => setVisibleCount((value) => value + 12)} className="min-h-12 w-full rounded-2xl border border-stone-200 bg-white text-sm font-extrabold text-green-800 hover:bg-green-50">Показать ещё</button></div>}
+          </>
         )}
       </div>
 

@@ -2,14 +2,16 @@
 
 import { useState, use, useEffect } from "react";
 import Link from "next/link";
+import NextImage from "next/image";
 import { ArrowLeft, CheckCircle2, QrCode, X, Heart, ShieldCheck, Share2 } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { complexName } from "@/lib/appConfig";
 
 export default function FundraiserDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { donateToFundraiser, posts } = useAppStore();
+  const { donateToFundraiser, posts, currentUser } = useAppStore();
   const [renderedAt] = useState(() => Date.now());
   const fundraiserPost = posts.find((post) => post.fundraiser?.id === id);
   const fundraiser = fundraiserPost?.fundraiser;
@@ -149,7 +151,7 @@ export default function FundraiserDetailPage({ params }: { params: Promise<{ id:
           {fundraiserPost?.attachments?.length ? (
             <div className="grid grid-cols-2 gap-2">
               {fundraiserPost.attachments.slice(0, 2).map((attachment) => (
-                <img key={attachment.id} src={attachment.url} alt="Документ по сбору" className="w-full h-28 rounded-2xl object-cover ring-1 ring-black/5" />
+                <NextImage key={attachment.id} src={attachment.url} alt="Документ по сбору" width={600} height={320} sizes="(max-width: 640px) 50vw, 320px" unoptimized className="w-full h-28 rounded-2xl object-cover ring-1 ring-black/5" />
               ))}
             </div>
           ) : (
@@ -262,7 +264,7 @@ export default function FundraiserDetailPage({ params }: { params: Promise<{ id:
                   </div>
                   <div>
                     <p className="text-xs font-bold text-red-900">Оплата через Kaspi Pay</p>
-                    <p className="text-[10px] text-red-600">Официальный расчетный счет ОСИ «Солнечный»</p>
+                    <p className="text-[10px] text-red-600">Официальный расчётный счёт ОСИ «{complexName(currentUser.complexName)}»</p>
                   </div>
                 </div>
 

@@ -50,6 +50,17 @@ export default function AuthStateSync() {
       .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, refresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "classifieds" }, refresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "service_requests" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "service_request_events" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "house_documents" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "house_document_acknowledgements" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "official_votes" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "official_vote_ballots" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "finance_transactions" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "emergency_alerts" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "home_schedule_items" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "amenity_bookings" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "visitor_passes" }, refresh)
       .subscribe();
 
     return () => {

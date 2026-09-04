@@ -1,0 +1,105 @@
+"use client";
+
+import { FormEvent, useMemo, useState } from "react";
+import {
+  AlertOctagon, CalendarCheck2, Camera, Car, Check, CheckCircle2, ChevronRight,
+  ClipboardCheck, Clock3, DoorOpen, History, KeyRound, LoaderCircle, Map,
+  MapPin, Plus, ShieldCheck, Star, TrafficCone, UserCheck, Wrench, X,
+} from "lucide-react";
+import QrPass from "@/components/access/QrPass";
+import { useOperationsStore, type AccessPass } from "@/stores/operationsStore";
+
+type Tab = "access" | "parking" | "works";
+
+const passLabels: Record<AccessPass["kind"], string> = {
+  single: "Одноразовый", permanent: "Постоянный", courier: "Курьер", vehicle: "Автомобиль",
+};
+
+export default function OperationsPage() {
+  const store = useOperationsStore();
+  const [tab, setTab] = useState<Tab>("access");
+  const [dialog, setDialog] = useState<"pass" | "parking" | "report" | "sos" | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [guestName, setGuestName] = useState("");
+  const [passKind, setPassKind] = useState<AccessPass["kind"]>("single");
+  const [vehiclePlate, setVehiclePlate] = useState("");
+  const [validUntil, setValidUntil] = useState("");
+  const [spotId, setSpotId] = useState("");
+  const [startsAt, setStartsAt] = useState("");
+  const [endsAt, setEndsAt] = useState("");
+  const [reason, setReason] = useState("");
+
+  const activePasses = store.passes.filter((item) => item.status === "active");
+  const freeSpots = store.parkingSpots.filter((item) => item.status === "free" && item.kind !== "resident");
+  const completion = useMemo(() => store.works.map((work) => ({ id: work.id, value: work.checklist.length ? Math.round(work.checklist.filter((item) => item.done).length / work.checklist.length * 100) : 0 })), [store.works]);
+
+  const submitPass = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!guestName.trim() || !validUntil) return setMessage("Укажите гостя и срок действия");
+    setBusy(true);
+    await store.createPass({ guestName: guestName.trim(), kind: passKind, vehiclePlate: vehiclePlate.trim() || undefined, validUntil });
+    setBusy(false); setDialog(null); setMessage("Пропуск создан — QR уже готов");
+  };
+
+  const submitParking = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!spotId || vehiclePlate.trim().length < 4 || !startsAt || !endsAt) return setMessage("Заполните место, автомобиль и время");
+    if (new Date(endsAt) <= new Date(startsAt)) return setMessage("Окончание должно быть позже начала");
+    setBusy(true); await store.bookParking(spotId, vehiclePlate.trim().toUpperCase(), startsAt, endsAt); setBusy(false); setDialog(null); setMessage("Гостевое место забронировано");
+  };
+
+  const submitReport = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!spotId || reason.trim().length < 5) return setMessage("Выберите место и опишите нарушение");
+    setBusy(true); await store.reportParking(spotId, reason.trim()); setBusy(false); setDialog(null); setMessage("Жалоба отправлена диспетчеру");
+  };
+
+  const sendSos = async () => {
+    setBusy(true); await store.triggerSos("Дом 2 · подъезд 1 · по данным профиля"); setBusy(false); setDialog(null); setMessage("SOS отправлен охране и диспетчеру");
+  };
+
+  return <div className="min-h-screen bg-[#f8f7f2] pb-10">
+    <header className="border-b border-stone-200/80 px-4 py-6 sm:px-6">
+      <div className="flex items-start justify-between gap-4">
+        <div><p className="text-xs font-extrabold uppercase tracking-[0.16em] text-green-800">Контур дома</p><h1 className="mt-1 text-2xl font-black tracking-[-0.035em] text-stone-950 sm:text-3xl">Доступ и эксплуатация</h1><p className="mt-1 max-w-xl text-sm leading-6 text-stone-600">Пропуска, парковка, журнал безопасности и контроль работ в одном месте.</p></div>
+        <button onClick={() => setDialog("sos")} className="btn-press grid min-h-12 min-w-12 place-items-center rounded-2xl bg-rose-600 text-white shadow-lg shadow-rose-200" aria-label="Отправить SOS"><AlertOctagon className="h-5 w-5" /></button>
+      </div>
+      <div className="mt-5 grid grid-cols-3 gap-1 rounded-2xl bg-stone-200/70 p-1" role="tablist">
+        {([{ id: "access", label: "Доступ", icon: KeyRound }, { id: "parking", label: "Парковка", icon: Car }, { id: "works", label: "Работы", icon: Wrench }] as const).map(({ id, label, icon: Icon }) => <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)} className={`flex min-h-11 items-center justify-center gap-2 rounded-xl text-xs font-extrabold transition ${tab === id ? "bg-white text-stone-950 shadow-sm" : "text-stone-700"}`}><Icon className="h-4 w-4" />{label}</button>)}
+      </div>
+    </header>
+
+    {message && <div role="status" className="mx-4 mt-4 flex items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-bold text-emerald-900 sm:mx-6"><span className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4" />{message}</span><button onClick={() => setMessage("")} aria-label="Закрыть"><X className="h-4 w-4" /></button></div>}
+
+    {tab === "access" && <main className="space-y-5 px-4 py-5 sm:px-6">
+      <div className="grid grid-cols-2 gap-3"><button onClick={() => setDialog("pass")} className="flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-violet-700 px-3 text-xs font-extrabold text-white"><Plus className="h-4 w-4" />Новый пропуск</button><button onClick={() => setDialog("sos")} className="flex min-h-14 items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-3 text-xs font-extrabold text-rose-800"><AlertOctagon className="h-4 w-4" />SOS</button></div>
+      <section><div className="flex items-center justify-between"><h2 className="text-sm font-black text-stone-950">Активные пропуска</h2><span className="text-xs font-bold text-stone-500">{activePasses.length}</span></div><div className="mt-3 grid gap-3 sm:grid-cols-2">{activePasses.map((pass, index) => <article key={pass.id} className="reveal-up overflow-hidden rounded-[26px] border border-violet-100 bg-white" style={{ animationDelay: `${index * 55}ms` }}><div className="flex items-start justify-between gap-4 p-4"><div><span className="rounded-full bg-violet-100 px-2.5 py-1 text-[10px] font-extrabold text-violet-800">{passLabels[pass.kind]}</span><h3 className="mt-3 font-extrabold text-stone-950">{pass.guestName}</h3>{pass.vehiclePlate && <p className="mt-1 text-xs font-bold text-stone-500">{pass.vehiclePlate}</p>}<p className="mt-2 text-[11px] text-stone-500">До {pass.validUntil} · проходов {pass.arrivals}</p></div><QrPass value={`korshi://pass/${pass.id}?code=${pass.code}`} label={`QR-пропуск для ${pass.guestName}`} /></div><div className="flex items-center justify-between border-t border-stone-100 bg-stone-50 px-4 py-3"><code className="text-sm font-black tracking-[0.14em] text-stone-900">{pass.code}</code><button onClick={() => void store.revokePass(pass.id)} className="rounded-xl px-3 py-2 text-xs font-extrabold text-rose-700 hover:bg-rose-50">Отозвать</button></div></article>)}</div></section>
+      <section className="rounded-[26px] border border-stone-200 bg-white p-4"><div className="flex items-center justify-between"><div><p className="text-xs font-extrabold uppercase tracking-[.12em] text-stone-400">Интеграции СКУД</p><h2 className="mt-1 text-sm font-black">Домофон и шлагбаум</h2></div><span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-extrabold text-amber-900">Нужен провайдер</span></div><p className="mt-2 text-xs leading-5 text-stone-600">Адаптеры, webhook и журнал событий подготовлены. Команды открытия активируются после добавления ключей оборудования в панели управления.</p></section>
+      <section><div className="flex items-center gap-2"><History className="h-4 w-4 text-green-800" /><h2 className="text-sm font-black">Журнал проходов</h2></div><div className="mt-3 overflow-hidden rounded-[24px] border border-stone-200 bg-white">{store.accessEvents.map((event) => <div key={event.id} className="flex items-center gap-3 border-b border-stone-100 p-4 last:border-0"><span className={`grid h-10 w-10 place-items-center rounded-2xl ${event.result === "allowed" ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-700"}`}>{event.result === "allowed" ? <DoorOpen className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}</span><div className="min-w-0 flex-1"><p className="truncate text-xs font-extrabold text-stone-900">{event.subject}</p><p className="mt-1 text-[11px] text-stone-500">{event.checkpoint} · {event.occurredAt}</p></div><span className="text-[10px] font-bold text-stone-500">{event.direction === "entry" ? "Вход" : "Выход"}</span></div>)}</div></section>
+      <section className="grid gap-3 sm:grid-cols-2"><div className="rounded-[24px] border border-emerald-200 bg-emerald-50 p-4"><p className="text-xs font-extrabold uppercase tracking-[.1em] text-emerald-800">Белый список</p>{store.securityLists.allow.map((item) => <p key={item} className="mt-2 flex items-center gap-2 text-xs font-bold text-emerald-950"><Check className="h-4 w-4" />{item}</p>)}</div><div className="rounded-[24px] border border-rose-200 bg-rose-50 p-4"><p className="text-xs font-extrabold uppercase tracking-[.1em] text-rose-800">Чёрный список</p>{store.securityLists.deny.map((item) => <p key={item} className="mt-2 flex items-center gap-2 text-xs font-bold text-rose-950"><X className="h-4 w-4" />{item}</p>)}</div></section>
+    </main>}
+
+    {tab === "parking" && <main className="space-y-5 px-4 py-5 sm:px-6">
+      <div className="grid grid-cols-2 gap-3"><button onClick={() => { setSpotId(freeSpots[0]?.id || ""); setDialog("parking"); }} className="flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-green-800 text-xs font-extrabold text-white"><CalendarCheck2 className="h-4 w-4" />Забронировать</button><button onClick={() => { setSpotId(store.parkingSpots[0]?.id || ""); setDialog("report"); }} className="flex min-h-14 items-center justify-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 text-xs font-extrabold text-amber-900"><TrafficCone className="h-4 w-4" />Сообщить</button></div>
+      <section className="overflow-hidden rounded-[28px] border border-stone-200 bg-stone-900 p-5 text-white"><div className="flex items-center justify-between"><div><p className="text-xs font-extrabold uppercase tracking-[.14em] text-stone-400">Схема парковки</p><h2 className="mt-1 text-lg font-black">Двор · северный въезд</h2></div><Map className="h-6 w-6 text-emerald-400" /></div><div className="mt-5 grid grid-cols-3 gap-3">{store.parkingSpots.map((spot) => <button key={spot.id} onClick={() => { setSpotId(spot.id); if (spot.status === "free" && spot.kind !== "resident") setDialog("parking"); }} className={`relative min-h-24 rounded-2xl border-2 p-3 text-left transition hover:-translate-y-0.5 ${spot.status === "free" ? "border-emerald-400/70 bg-emerald-400/10" : spot.status === "reserved" ? "border-amber-400/70 bg-amber-400/10" : "border-stone-600 bg-stone-800"}`}><Car className={`h-5 w-5 ${spot.status === "free" ? "text-emerald-400" : spot.status === "reserved" ? "text-amber-400" : "text-stone-400"}`} /><span className="mt-3 block text-sm font-black">{spot.label}</span><span className="text-[10px] text-stone-400">{spot.status === "free" ? "Свободно" : spot.status === "reserved" ? "Бронь" : "Занято"}</span></button>)}</div><div className="mt-4 flex flex-wrap gap-4 text-[10px] font-bold text-stone-400"><span>● <b className="text-emerald-400">свободно</b></span><span>● <b className="text-amber-400">бронь</b></span><span>● занято</span></div></section>
+      {store.parkingBookings.length > 0 && <section><h2 className="text-sm font-black">Мои бронирования</h2><div className="mt-3 space-y-3">{store.parkingBookings.map((booking) => <article key={booking.id} className="flex items-center gap-3 rounded-[22px] border border-stone-200 bg-white p-4"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-emerald-100 text-emerald-800"><Car className="h-5 w-5" /></span><div className="min-w-0 flex-1"><p className="text-sm font-extrabold">{store.parkingSpots.find((spot) => spot.id === booking.spotId)?.label} · {booking.vehiclePlate}</p><p className="mt-1 text-[11px] text-stone-500">{booking.startsAt} — {booking.endsAt}</p></div>{booking.status === "confirmed" && <button onClick={() => void store.cancelParking(booking.id)} className="text-xs font-extrabold text-rose-700">Отменить</button>}</article>)}</div></section>}
+      <section className="rounded-[24px] border border-stone-200 bg-white p-4"><div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm font-black"><ShieldCheck className="h-4 w-4 text-green-800" />Управление шлагбаумом</span><span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-extrabold text-amber-900">Адаптер не настроен</span></div><p className="mt-2 text-xs leading-5 text-stone-600">История въезда/выезда ведётся. Удалённое открытие появится после выбора оборудования и выдачи API-ключа.</p></section>
+    </main>}
+
+    {tab === "works" && <main className="space-y-4 px-4 py-5 sm:px-6">
+      <div className="grid grid-cols-3 gap-3">{[{ label: "В плане", value: store.works.filter((w) => w.status === "planned").length }, { label: "В работе", value: store.works.filter((w) => w.status === "in_progress").length }, { label: "Пропущено", value: store.works.filter((w) => w.status === "missed").length }].map((item) => <div key={item.label} className="rounded-[20px] border border-stone-200 bg-white p-3 text-center"><p className="text-xl font-black text-stone-950">{item.value}</p><p className="mt-1 text-[10px] font-bold text-stone-500">{item.label}</p></div>)}</div>
+      {store.works.map((work, index) => { const progress = completion.find((item) => item.id === work.id)?.value || 0; return <article key={work.id} className={`reveal-up rounded-[26px] border bg-white p-4 ${work.status === "missed" ? "border-rose-200" : "border-stone-200"}`} style={{ animationDelay: `${index * 55}ms` }}><div className="flex items-start gap-3"><span className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl ${work.status === "missed" ? "bg-rose-100 text-rose-700" : "bg-violet-100 text-violet-800"}`}><Wrench className="h-5 w-5" /></span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-start justify-between gap-2"><div><h2 className="text-sm font-black text-stone-950">{work.title}</h2><p className="mt-1 text-[11px] font-semibold text-stone-500">{work.location} · {work.startsAt}</p></div><span className={`rounded-full px-2.5 py-1 text-[10px] font-extrabold ${work.status === "missed" ? "bg-rose-100 text-rose-800" : work.status === "in_progress" ? "bg-amber-100 text-amber-900" : "bg-stone-100 text-stone-600"}`}>{work.status === "missed" ? "Пропущено" : work.status === "in_progress" ? "Выполняется" : "Запланировано"}</span></div><p className="mt-2 flex items-center gap-1 text-xs text-stone-600"><UserCheck className="h-3.5 w-3.5" />{work.employee}</p>{work.geo && <p className="mt-1 flex items-center gap-1 text-[11px] text-stone-500"><MapPin className="h-3.5 w-3.5" />Геометка исполнителя: {work.geo}</p>}</div></div><div className="mt-4 h-2 overflow-hidden rounded-full bg-stone-100"><div className="h-full rounded-full bg-green-700 transition-[width] duration-500" style={{ width: `${progress}%` }} /></div><div className="mt-3 space-y-2">{work.checklist.map((item) => <button key={item.id} onClick={() => store.toggleWorkCheck(work.id, item.id)} className="flex min-h-10 w-full items-center gap-3 rounded-xl px-2 text-left text-xs font-bold hover:bg-stone-50"><span className={`grid h-5 w-5 place-items-center rounded-md border ${item.done ? "border-green-700 bg-green-700 text-white" : "border-stone-300"}`}>{item.done && <Check className="h-3 w-3" />}</span>{item.label}</button>)}</div><div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-stone-100 pt-3"><span className="flex items-center gap-3 text-[11px] font-bold text-stone-500"><Camera className="h-4 w-4" />Фотоотчёт {work.photoUrl ? "готов" : "ожидается"}</span><div className="flex items-center gap-1" aria-label="Оценка качества">{[1,2,3,4,5].map((value) => <button key={value} onClick={() => void store.rateWork(work.id, value)} className="grid h-8 w-8 place-items-center rounded-lg hover:bg-amber-50" aria-label={`Оценить на ${value}`}><Star className={`h-4 w-4 ${value <= (work.rating || 0) ? "fill-amber-400 text-amber-500" : "text-stone-300"}`} /></button>)}</div></div></article>; })}
+    </main>}
+
+    {dialog && <div className="fixed inset-0 z-[90] flex items-end justify-center bg-stone-950/50 backdrop-blur-sm sm:items-center sm:p-6" role="dialog" aria-modal="true"><form onSubmit={dialog === "pass" ? submitPass : dialog === "parking" ? submitParking : dialog === "report" ? submitReport : (event) => event.preventDefault()} className="sheet-enter w-full max-w-lg rounded-t-[30px] bg-white p-5 shadow-2xl sm:rounded-[30px] sm:p-6"><div className="flex items-start justify-between"><div><p className="text-xs font-extrabold uppercase tracking-[.13em] text-green-800">Korshi · безопасность</p><h2 className="mt-1 text-xl font-black">{dialog === "pass" ? "Новый пропуск" : dialog === "parking" ? "Гостевая парковка" : dialog === "report" ? "Сообщить о нарушении" : "Экстренный SOS"}</h2></div><button type="button" onClick={() => setDialog(null)} className="grid h-11 w-11 place-items-center rounded-2xl bg-stone-100" aria-label="Закрыть"><X className="h-5 w-5" /></button></div>
+      {dialog === "pass" && <div className="mt-5 space-y-4"><Field label="Имя гостя"><input value={guestName} onChange={(e) => setGuestName(e.target.value)} className="field" /></Field><Field label="Тип пропуска"><select value={passKind} onChange={(e) => setPassKind(e.target.value as AccessPass["kind"])} className="field"><option value="single">Одноразовый</option><option value="permanent">Постоянный</option><option value="courier">Курьер</option><option value="vehicle">Автомобиль</option></select></Field>{passKind === "vehicle" && <Field label="Номер автомобиля"><input value={vehiclePlate} onChange={(e) => setVehiclePlate(e.target.value)} className="field uppercase" /></Field>}<Field label="Действует до"><input type="datetime-local" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} className="field" /></Field></div>}
+      {(dialog === "parking" || dialog === "report") && <div className="mt-5 space-y-4"><Field label="Парковочное место"><select value={spotId} onChange={(e) => setSpotId(e.target.value)} className="field">{(dialog === "parking" ? freeSpots : store.parkingSpots).map((spot) => <option key={spot.id} value={spot.id}>{spot.label} · {spot.zone}</option>)}</select></Field>{dialog === "parking" ? <><Field label="Номер автомобиля"><input value={vehiclePlate} onChange={(e) => setVehiclePlate(e.target.value)} className="field uppercase" /></Field><Field label="Начало"><input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} className="field" /></Field><Field label="Окончание"><input type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} className="field" /></Field></> : <Field label="Что произошло"><textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={4} className="field py-3" placeholder="Автомобиль перекрыл проезд..." /></Field>}</div>}
+      {dialog === "sos" && <div className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 p-4"><AlertOctagon className="h-7 w-7 text-rose-700" /><p className="mt-3 text-sm font-extrabold text-rose-950">Сигнал получат охрана и диспетчер</p><p className="mt-1 text-xs leading-5 text-rose-800">К событию добавится адрес активной квартиры. При прямой угрозе жизни также звоните 112.</p><a href="tel:112" className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-xl bg-white px-3 text-xs font-extrabold text-rose-800">Позвонить 112 <ChevronRight className="h-4 w-4" /></a></div>}
+      {message && <p role="alert" className="mt-4 rounded-xl bg-amber-50 p-3 text-xs font-bold text-amber-900">{message}</p>}<button type={dialog === "sos" ? "button" : "submit"} onClick={dialog === "sos" ? () => void sendSos() : undefined} disabled={busy} className={`mt-5 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl text-sm font-extrabold text-white disabled:opacity-50 ${dialog === "sos" ? "bg-rose-600" : "bg-green-800"}`}>{busy && <LoaderCircle className="h-4 w-4 animate-spin" />}{dialog === "pass" ? "Создать QR-пропуск" : dialog === "parking" ? "Забронировать" : dialog === "report" ? "Отправить диспетчеру" : "Отправить SOS"}</button></form></div>}
+  </div>;
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return <label className="block text-sm font-extrabold text-stone-900">{label}{children}</label>;
+}

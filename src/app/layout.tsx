@@ -1,9 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Manrope } from "next/font/google";
 import AuthStateSync from "@/components/auth/AuthStateSync";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin", "cyrillic"] });
+const manrope = Manrope({ subsets: ["latin", "cyrillic"] });
 
 export const metadata: Metadata = {
   title: "Korshi — Сообщество вашего ЖК",
@@ -19,8 +19,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  themeColor: "#16a34a",
+  themeColor: "#166534",
 };
 
 export default function RootLayout({
@@ -29,10 +28,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ru">
-      <body className={inter.className}>
+    <html lang="ru" data-scroll-behavior="smooth">
+      <body className={manrope.className}>
         <AuthStateSync />
-        <div className="min-h-screen bg-gray-50">{children}</div>
+        <div className="min-h-screen bg-[#f8f7f2]">{children}</div>
       </body>
     </html>
   );

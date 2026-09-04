@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, use } from "react";
+import { useState, useRef, useEffect, use, useMemo } from "react";
 import Link from "next/link";
 import { ArrowLeft, Send, Paperclip, MoreVertical, ShieldCheck, CheckCheck } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
@@ -19,7 +19,7 @@ export default function ChatRoomPage({ params }: { params: Promise<{ chatId: str
     icon: "💬",
   };
 
-  const chatMessages = messages[chatId] || [];
+  const chatMessages = useMemo(() => messages[chatId] || [], [chatId, messages]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

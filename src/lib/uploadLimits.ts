@@ -2,6 +2,12 @@ export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
 export const IMAGE_UPLOAD_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 export const DOCUMENT_UPLOAD_TYPES = [...IMAGE_UPLOAD_TYPES, "application/pdf"] as const;
+export const REQUEST_UPLOAD_TYPES = [...DOCUMENT_UPLOAD_TYPES, "video/mp4", "video/webm", "video/quicktime"] as const;
+export const HOUSE_DOCUMENT_UPLOAD_TYPES = [
+  ...DOCUMENT_UPLOAD_TYPES,
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+] as const;
 
 export function validateUploadFile(
   file: File,
@@ -11,7 +17,7 @@ export function validateUploadFile(
     return "Размер файла не должен превышать 10 МБ";
   }
   if (!allowedTypes.includes(file.type.toLowerCase())) {
-    return "Поддерживаются только JPG, PNG, WEBP и PDF";
+    return "Формат файла не поддерживается";
   }
   return null;
 }

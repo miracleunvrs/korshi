@@ -2,6 +2,7 @@
 
 import { useState, use } from "react";
 import Link from "next/link";
+import NextImage from "next/image";
 import { ArrowLeft, Send, Heart, Share2, MoreHorizontal, ShieldCheck, CheckCircle2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -65,15 +66,18 @@ export default function PostDetailPage({ params }: { params: Promise<{ postId: s
         {/* Карточка поста */}
         <div className="p-6 border-b border-gray-100 space-y-4">
           <div className="flex items-center gap-3">
-            <img
+            <NextImage
               src={post.author?.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80"}
               alt=""
+              width={44}
+              height={44}
+              unoptimized
               className="w-11 h-11 rounded-2xl object-cover ring-2 ring-gray-100 shadow-xs"
             />
             <div>
               <div className="flex items-center gap-1.5">
                 <span className="font-extrabold text-sm text-gray-900">
-                  {post.is_official ? "ОСИ «Солнечный»" : post.author?.full_name}
+                  {post.author?.full_name || (post.is_official ? "Управление ЖК" : "Сосед")}
                 </span>
                 {post.is_official ? (
                   <ShieldCheck className="w-4 h-4 text-green-600 inline" />
@@ -97,10 +101,14 @@ export default function PostDetailPage({ params }: { params: Promise<{ postId: s
 
           {post.attachments && post.attachments.length > 0 && (
             <div className="rounded-3xl overflow-hidden mt-2 shadow-xs">
-              <img
+              <NextImage
                 src={post.attachments[0].url}
                 alt="Фото"
-                className="w-full max-h-80 object-cover rounded-3xl"
+                width={1200}
+                height={800}
+                sizes="(max-width: 768px) 100vw, 768px"
+                unoptimized
+                className="h-auto w-full max-h-80 object-cover rounded-3xl"
               />
             </div>
           )}

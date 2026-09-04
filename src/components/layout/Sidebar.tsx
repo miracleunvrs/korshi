@@ -2,20 +2,32 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import NextImage from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { 
-  Home, 
-  MessageSquare, 
-  Tag, 
-  Building2, 
-  User, 
-  Plus, 
-  ShieldCheck, 
-  Settings, 
+import {
+  Home,
+  MessageSquare,
+  Tag,
+  Building2,
+  User,
+  Plus,
+  ShieldCheck,
+  Settings,
   ShieldAlert,
-  LogOut
+  LogOut,
+  ClipboardList,
+  Bell,
+  FileText,
+  Vote,
+  Coins,
+  Siren,
+  Grid2X2,
+  Shield,
+  UsersRound,
+  Sparkles,
 } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
+import { complexName } from "@/lib/appConfig";
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -39,10 +51,22 @@ export default function Sidebar() {
 
   const totalUnread = chats.reduce((acc, c) => acc + c.unreadCount, 0);
   const pendingRequests = verificationRequests.filter((r) => r.status === "pending").length;
+  const activeServiceRequests = useAppStore((s) => s.serviceRequests.filter((request) => request.status === "submitted" || request.status === "in_progress").length);
+  const unreadNotifications = useAppStore((s) => s.notifications.filter((notification) => !notification.isRead).length);
 
   const menuItems = [
-    { href: "/feed", label: "Лента новостей", icon: Home },
+    { href: "/feed", label: "Сегодня", icon: Home },
     { href: "/chats", label: "Мессенджер", icon: MessageSquare, badge: totalUnread > 0 ? totalUnread : undefined },
+    { href: "/requests", label: "Заявки", icon: ClipboardList, badge: activeServiceRequests > 0 ? activeServiceRequests : undefined },
+    { href: "/notifications", label: "Уведомления", icon: Bell, badge: unreadNotifications > 0 ? unreadNotifications : undefined },
+    { href: "/documents", label: "Документы", icon: FileText },
+    { href: "/votes", label: "Голосования", icon: Vote },
+    { href: "/finance", label: "Финансы дома", icon: Coins },
+    { href: "/emergency", label: "Аварийный центр", icon: Siren },
+    { href: "/services", label: "Сервисы дома", icon: Grid2X2 },
+    { href: "/operations", label: "Доступ и эксплуатация", icon: Shield },
+    { href: "/community", label: "Сообщество", icon: UsersRound },
+    { href: "/ai", label: "Korshi AI", icon: Sparkles },
     { href: "/classifieds", label: "Объявления и услуги", icon: Tag },
     { href: "/hoa", label: "Мой ЖК (ОСИ)", icon: Building2 },
     { href: "/profile", label: "Моя страница", icon: User },
@@ -53,28 +77,31 @@ export default function Sidebar() {
 
   return (
     <>
-      <aside className="w-64 shrink-0 hidden md:flex flex-col justify-between sticky top-0 h-screen p-4 border-r border-gray-200/80 bg-white select-none">
+      <aside className="sticky top-0 hidden h-screen w-[270px] shrink-0 select-none flex-col justify-between overflow-y-auto border-r border-stone-200/80 bg-[#f8f7f2] p-4 md:flex">
         <div className="space-y-4">
           {/* Логотип ЖК */}
           <Link href="/feed" className="flex items-center gap-3 px-2 py-1 group">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-green-600 to-emerald-500 flex items-center justify-center text-white font-black text-sm shadow-md shadow-green-600/30 group-hover:scale-105 transition-transform">
-              ЖК
+            <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#173f2a] text-sm font-black text-white shadow-[0_10px_28px_rgba(23,63,42,.18)] transition-transform duration-200 group-hover:-translate-y-0.5">
+              K
             </div>
             <div>
               <div className="flex items-center gap-1">
-                <span className="font-extrabold text-gray-900 text-base leading-tight">Солнечный</span>
-                <ShieldCheck className="w-4 h-4 text-green-600 shrink-0" />
+                <span className="text-base font-black leading-tight text-stone-950">{complexName(currentUser.complexName)}</span>
+                <ShieldCheck className="h-4 w-4 shrink-0 text-green-700" />
               </div>
-              <p className="text-[11px] text-gray-400 font-medium">Закрытая сеть ЖК</p>
+              <p className="text-[11px] font-semibold text-stone-600">Пространство соседей</p>
             </div>
           </Link>
 
           {/* Мини-профиль с кнопкой быстрой смены аккаунта */}
-          <div className="p-2.5 rounded-2xl bg-gray-50 border border-gray-100 space-y-2">
+          <div className="space-y-2 rounded-[22px] border border-stone-200/80 bg-white p-2.5 shadow-[0_8px_28px_rgba(41,37,36,.04)]">
             <Link href="/profile" className="flex items-center gap-2.5 group">
-              <img
+              <NextImage
                 src={currentUser.avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80"}
                 alt={currentUser.fullName}
+                width={40}
+                height={40}
+                unoptimized
                 className="w-10 h-10 rounded-xl object-cover ring-2 ring-white shadow-xs shrink-0"
               />
               <div className="flex-1 min-w-0">
@@ -99,14 +126,14 @@ export default function Sidebar() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition ${
+                  className={`flex min-h-11 items-center justify-between rounded-2xl px-3.5 py-2.5 text-xs font-semibold transition duration-200 sm:text-sm ${
                     isActive
-                      ? item.isAdmin ? "bg-zinc-900 text-white font-bold" : "bg-green-50 text-green-700 font-bold"
-                      : "text-gray-600 hover:bg-gray-100/80 hover:text-gray-900"
+                      ? item.isAdmin ? "bg-stone-900 text-white font-bold" : "bg-green-800 text-white font-bold shadow-[0_8px_22px_rgba(22,101,52,.14)]"
+                      : "text-stone-600 hover:bg-white hover:text-stone-950"
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${isActive ? item.isAdmin ? "text-white" : "text-green-600 stroke-[2.4]" : "text-gray-400 stroke-[1.8]"}`} />
+                    <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${isActive ? "text-white stroke-[2.4]" : "text-stone-400 stroke-[1.8]"}`} />
                     <span>{item.label}</span>
                   </div>
                   {item.badge !== undefined && (
@@ -122,7 +149,7 @@ export default function Sidebar() {
           {/* Кнопка создания записи */}
           <Link
             href="/create"
-            className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-green-600 hover:bg-green-700 active:scale-95 text-white font-bold text-sm rounded-2xl shadow-md shadow-green-600/20 transition"
+            className="btn-press flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-violet-600 px-4 py-3 text-sm font-extrabold text-white shadow-[0_10px_24px_rgba(124,58,237,.18)] transition hover:-translate-y-0.5 hover:bg-violet-700"
           >
             <Plus className="w-4 h-4 stroke-[3]" />
             <span>Создать запись</span>
@@ -140,9 +167,9 @@ export default function Sidebar() {
             <LogOut className="w-4 h-4" />
             {isLoggingOut ? "Выход..." : "Выйти из аккаунта"}
           </button>
-          <div className="text-xs text-gray-400 flex items-center justify-between">
+          <div className="text-xs text-gray-600 flex items-center justify-between">
             <span>© 2026 Korshi</span>
-            <Link href="/profile" className="hover:text-gray-600">
+            <Link href="/profile" className="hover:text-gray-800" aria-label="Настройки профиля">
               <Settings className="w-4 h-4" />
             </Link>
           </div>

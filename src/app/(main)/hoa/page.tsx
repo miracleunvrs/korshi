@@ -13,8 +13,10 @@ import {
   ChevronRight, 
   ArrowRight,
   Plus
+  ,Grid2X2
 } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
+import { complexName } from "@/lib/appConfig";
 
 export default function HoaPage() {
   const [activeTab, setActiveTab] = useState("Новости");
@@ -33,9 +35,9 @@ export default function HoaPage() {
   const activePolls = posts.filter((p) => (p.type === "poll" || p.type === "official_poll") && p.poll);
 
   return (
-    <div className="min-h-screen bg-white pb-16">
+    <div className="min-h-screen bg-[#fffefb] pb-16">
       {/* Шапка */}
-      <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-gray-100 px-6 py-4 flex items-center justify-between shadow-xs">
+      <div className="glass-nav sticky top-16 z-20 flex items-center justify-between border-b border-stone-200/80 px-4 py-4 shadow-xs sm:px-6 md:top-0">
         <h1 className="font-extrabold text-gray-900 text-lg">Мой ЖК (ОСИ)</h1>
         <Link
           href="/hoa/manage"
@@ -54,12 +56,27 @@ export default function HoaPage() {
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <h2 className="font-black text-white text-lg">ОСИ «Солнечный»</h2>
+                <h2 className="font-black text-white text-lg">ОСИ «{complexName(currentUser.complexName)}»</h2>
                 <ShieldCheck className="w-5 h-5 text-white fill-white/20" />
               </div>
               <p className="text-xs text-green-100 font-medium">Официальный аккаунт управления ЖК</p>
             </div>
           </div>
+        </div>
+
+        <div className="grid gap-2 sm:grid-cols-2">
+          <Link href="/documents" className="flex min-h-20 items-center justify-between rounded-3xl border border-violet-100 bg-violet-50 p-4 text-violet-950 transition hover:-translate-y-0.5 hover:border-violet-200">
+            <span className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-violet-700 text-white"><FileText className="h-5 w-5" /></span><span><span className="block text-sm font-extrabold">Документы</span><span className="block text-xs text-violet-700">Архив дома</span></span></span><ChevronRight className="h-5 w-5" />
+          </Link>
+          <Link href="/votes" className="flex min-h-20 items-center justify-between rounded-3xl border border-amber-100 bg-amber-50 p-4 text-amber-950 transition hover:-translate-y-0.5 hover:border-amber-200">
+            <span className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-amber-500 text-white"><BarChart3 className="h-5 w-5" /></span><span><span className="block text-sm font-extrabold">Голосования</span><span className="block text-xs text-amber-700">Кворум и решения</span></span></span><ChevronRight className="h-5 w-5" />
+          </Link>
+          <Link href="/finance" className="flex min-h-20 items-center justify-between rounded-3xl border border-emerald-100 bg-emerald-50 p-4 text-emerald-950 transition hover:-translate-y-0.5 hover:border-emerald-200">
+            <span className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-emerald-700 text-white"><Coins className="h-5 w-5" /></span><span><span className="block text-sm font-extrabold">Финансы</span><span className="block text-xs text-emerald-700">Бюджет и расходы</span></span></span><ChevronRight className="h-5 w-5" />
+          </Link>
+          <Link href="/services" className="flex min-h-20 items-center justify-between rounded-3xl border border-sky-100 bg-sky-50 p-4 text-sky-950 transition hover:-translate-y-0.5 hover:border-sky-200">
+            <span className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-sky-700 text-white"><Grid2X2 className="h-5 w-5" /></span><span><span className="block text-sm font-extrabold">Сервисы</span><span className="block text-xs text-sky-700">Пропуска и бронь</span></span></span><ChevronRight className="h-5 w-5" />
+          </Link>
         </div>
 
         {/* Быстрые категории */}

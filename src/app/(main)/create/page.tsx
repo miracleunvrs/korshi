@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { 
@@ -20,6 +20,7 @@ import { useAppStore } from "@/stores/appStore";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { IMAGE_UPLOAD_TYPES, validateUploadFile } from "@/lib/uploadLimits";
+import { uploadWithRetry } from "@/lib/supabase/uploadWithRetry";
 
 export default function CreatePostPage() {
   const router = useRouter();
@@ -44,6 +45,14 @@ export default function CreatePostPage() {
     { id: "initiative", label: "Инициатива", icon: Lightbulb, desc: "Предложить улучшение для двора или дома" },
     { id: "event", label: "Событие", icon: Calendar, desc: "Субботник, праздник или встреча" },
   ];
+
+  useEffect(() => {
+    const requestedType = new URLSearchParams(window.location.search).get("type");
+    const validTypes: PostType[] = ["post", "announcement", "service", "help_request", "poll", "initiative", "event"];
+    if (!validTypes.includes(requestedType as PostType)) return;
+    const timer = window.setTimeout(() => setType(requestedType as PostType), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   const handleAddPollOption = () => {
     if (pollOptions.length < 6) {
@@ -80,11 +89,10 @@ export default function CreatePostPage() {
     try {
       if (imageFile && isSupabaseConfigured()) {
         imagePath = `${currentUser.id}/posts/${crypto.randomUUID()}-${imageFile.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-        const { error } = await createClient().storage.from("house-media").upload(imagePath, imageFile, {
+        await uploadWithRetry(() => createClient().storage.from("house-media").upload(imagePath, imageFile, {
           contentType: imageFile.type || "application/octet-stream",
           upsert: false,
-        });
-        if (error) throw error;
+        }));
       }
 
     const newPostId = `post-${Date.now()}`;
@@ -187,9 +195,9 @@ export default function CreatePostPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white pb-12">
+    <div className="min-h-screen bg-[#fffefb] pb-12">
       {/* Шапка */}
-      <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-gray-100 px-4 py-3 flex items-center justify-between shadow-xs">
+      <div className="glass-nav sticky top-16 z-20 flex items-center justify-between border-b border-stone-200/80 px-4 py-3 shadow-xs md:top-0">
         <Link href="/feed" className="text-gray-600 p-1 -ml-1 hover:text-gray-900 transition">
           <ArrowLeft className="w-5 h-5" />
         </Link>
@@ -197,7 +205,7 @@ export default function CreatePostPage() {
         <button
           onClick={handleSubmit}
           disabled={loading || !content.trim() || !currentUser.verified}
-          className="text-xs font-bold bg-green-600 hover:bg-green-700 text-white px-3.5 py-1.5 rounded-full disabled:opacity-40 shadow-xs transition"
+          className="min-h-10 rounded-xl bg-green-800 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs transition hover:bg-green-900 disabled:opacity-40"
         >
           {loading ? "Публикация..." : "Опубликовать"}
         </button>

@@ -1,139 +1,51 @@
 "use client";
 
 import Link from "next/link";
-import { 
-  Building2, 
-  ShieldCheck, 
-  PhoneCall, 
-  Coins, 
-  BarChart3, 
-  ArrowRight,
-  Users
-} from "lucide-react";
+import { ArrowRight, Building2, CheckCircle2, ClipboardCheck, PhoneCall, ShieldCheck, Vote } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { APP_CONFIG, complexName } from "@/lib/appConfig";
+import { useAppStore } from "@/stores/appStore";
 
 export default function RightWidgetPanel() {
+  const pathname = usePathname();
+  const currentUser = useAppStore((state) => state.currentUser);
+  const requests = useAppStore((state) => state.serviceRequests);
+  const activeRequests = requests.filter((item) => item.status === "submitted" || item.status === "in_progress");
+  const latestRequest = activeRequests[0];
+  const isRequests = pathname.startsWith("/requests");
+
   return (
-    <aside className="w-80 shrink-0 hidden lg:flex flex-col gap-4 p-4 sticky top-0 h-screen overflow-y-auto scrollbar-hide">
-      {/* Виджет ОСИ и контакты */}
-      <div className="p-4 bg-white rounded-3xl border border-gray-200/80 shadow-xs space-y-3">
+    <aside className="scrollbar-hide sticky top-0 hidden h-screen w-[324px] shrink-0 flex-col gap-3 overflow-y-auto bg-[#f8f7f2] p-4 lg:flex" aria-label="Актуальная информация о доме">
+      <div className="rounded-[26px] bg-[#173f2a] p-4 text-white shadow-[0_16px_42px_rgba(23,63,42,.16)]">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-green-600 text-white flex items-center justify-center shadow-sm">
-            <Building2 className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-1">
-              <h3 className="font-bold text-gray-900 text-xs">ОСИ «Солнечный»</h3>
-              <ShieldCheck className="w-3.5 h-3.5 text-green-600" />
-            </div>
-            <p className="text-[11px] text-green-600 font-medium">Управление на связи</p>
+          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-white/12"><Building2 className="h-5 w-5" /></div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1"><h2 className="truncate text-sm font-extrabold">ОСИ «{complexName(currentUser.complexName)}»</h2><ShieldCheck className="h-4 w-4 text-emerald-300" /></div>
+            <p className="mt-0.5 flex items-center gap-1.5 text-[11px] font-semibold text-emerald-100/75"><span className="status-pulse h-1.5 w-1.5 rounded-full bg-emerald-300" />Управление на связи</p>
           </div>
         </div>
-
-        <div className="space-y-1.5 pt-1 text-xs">
-          <a
-            href="tel:+77271234567"
-            className="flex items-center justify-between p-2 rounded-xl bg-gray-50 hover:bg-gray-100 text-gray-700 transition"
-          >
-            <span className="text-[11px] font-semibold text-gray-500">Аварийная служба:</span>
-            <span className="font-bold text-gray-900 flex items-center gap-1">
-              <PhoneCall className="w-3 h-3 text-red-500" /> 109
-            </span>
-          </a>
-          <a
-            href="tel:+77771234567"
-            className="flex items-center justify-between p-2 rounded-xl bg-gray-50 hover:bg-gray-100 text-gray-700 transition"
-          >
-            <span className="text-[11px] font-semibold text-gray-500">Диспетчер ЖК:</span>
-            <span className="font-bold text-gray-900">+7 (777) 123-45-67</span>
-          </a>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <a href={`tel:${APP_CONFIG.emergencyPhone}`} className="rounded-2xl bg-white/9 p-3 transition hover:bg-white/14"><span className="block text-[10px] font-bold uppercase tracking-wider text-emerald-100/60">Аварийная</span><span className="mt-1 flex items-center gap-1.5 text-sm font-black"><PhoneCall className="h-3.5 w-3.5" />{APP_CONFIG.emergencyPhone}</span></a>
+          <a href={`tel:${APP_CONFIG.dispatcherPhone.replace(/[^+\d]/g, "")}`} className="rounded-2xl bg-white/9 p-3 transition hover:bg-white/14"><span className="block text-[10px] font-bold uppercase tracking-wider text-emerald-100/60">Диспетчер</span><span className="mt-1 block truncate text-xs font-black">{APP_CONFIG.dispatcherPhone}</span></a>
         </div>
       </div>
 
-      {/* Виджет активного сбора */}
-      <div className="p-4 bg-gradient-to-br from-green-50 to-emerald-50/50 rounded-3xl border border-green-200/60 shadow-xs space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-green-900">
-            <Coins className="w-4 h-4 text-green-700" />
-            <span>Активный сбор ЖК</span>
-          </div>
-          <span className="px-2 py-0.5 bg-green-100 text-green-800 text-[10px] font-bold rounded-full">
-            62%
-          </span>
-        </div>
-
-        <div>
-          <h4 className="font-bold text-gray-900 text-xs leading-snug">
-            Благоустройство двора и новая детская площадка
-          </h4>
-          <p className="text-[11px] text-gray-500 mt-1">
-            Собрано <strong className="text-gray-900 font-bold">1 250 000 ₸</strong> из 2 млн ₸
-          </p>
-        </div>
-
-        <div className="w-full bg-green-200/60 h-2 rounded-full overflow-hidden">
-          <div className="bg-green-600 h-full rounded-full" style={{ width: "62%" }} />
-        </div>
-
-        <Link
-          href="/hoa/fundraisers/fund-1"
-          className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-xs transition"
-        >
-          Внести вклад <ArrowRight className="w-3.5 h-3.5" />
-        </Link>
+      <div className="rounded-[26px] border border-stone-200/80 bg-[#fffefb] p-4 shadow-[0_8px_30px_rgba(41,37,36,.045)]">
+        <div className="flex items-center justify-between"><p className="flex items-center gap-2 text-xs font-extrabold text-stone-900"><ClipboardCheck className="h-4 w-4 text-green-800" />Мои заявки</p><span className="rounded-full bg-amber-50 px-2 py-1 text-[10px] font-black text-amber-800">{activeRequests.length} активных</span></div>
+        {latestRequest ? <div className="mt-4"><p className="text-sm font-extrabold text-stone-900">{latestRequest.title}</p><p className="mt-1 text-xs leading-5 text-stone-500">{latestRequest.assigneeName ? `${latestRequest.assigneeName} · ` : ""}{latestRequest.status === "in_progress" ? "в работе" : "заявка принята"}</p><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-stone-100"><div className={`h-full rounded-full bg-green-700 transition-all duration-700 ${latestRequest.status === "in_progress" ? "w-2/3" : "w-1/3"}`} /></div></div> : <p className="mt-4 text-xs text-stone-500">Активных заявок нет.</p>}
+        <Link href="/requests" className="mt-4 flex min-h-10 items-center justify-between rounded-xl bg-stone-100 px-3 text-xs font-extrabold text-stone-800 transition hover:bg-stone-200">{isRequests ? "Создать новую" : "Открыть заявки"}<ArrowRight className="h-3.5 w-3.5" /></Link>
       </div>
 
-      {/* Виджет активного опроса */}
-      <div className="p-4 bg-white rounded-3xl border border-gray-200/80 shadow-xs space-y-3">
-        <div className="flex items-center gap-1.5 text-xs font-bold text-gray-900">
-          <BarChart3 className="w-4 h-4 text-green-600" />
-          <span>Голосование до 25 мая</span>
-        </div>
-
-        <h4 className="font-bold text-gray-900 text-xs leading-snug">
-          Какой проект благоустройства двора вам больше нравится?
-        </h4>
-
-        <div className="space-y-1.5 text-xs">
-          <div className="p-2 bg-gray-50 rounded-xl text-[11px] text-gray-700 flex justify-between">
-            <span>Детская эко-площадка</span>
-            <strong className="text-green-700">62%</strong>
-          </div>
-          <div className="p-2 bg-gray-50 rounded-xl text-[11px] text-gray-700 flex justify-between">
-            <span>Зона воркаута и спорт</span>
-            <strong className="text-gray-500">26%</strong>
-          </div>
-        </div>
-
-        <Link
-          href="/feed"
-          className="block text-center text-xs font-bold text-green-600 hover:text-green-700 pt-1"
-        >
-          Участвовать в опросе →
-        </Link>
+      <div className="rounded-[26px] border border-violet-100 bg-violet-50/70 p-4">
+        <div className="flex items-center justify-between"><p className="flex items-center gap-2 text-xs font-extrabold text-violet-950"><Vote className="h-4 w-4 text-violet-700" />Нужно ваше решение</p><span className="text-[10px] font-bold text-violet-600">ещё 5 дней</span></div>
+        <h3 className="mt-3 text-sm font-extrabold leading-5 text-stone-950">Какой проект двора выбрать?</h3>
+        <p className="mt-1 text-xs leading-5 text-stone-600">Голос уже отдали 68 жителей.</p>
+        <Link href="/feed" className="mt-4 flex min-h-10 items-center justify-center gap-2 rounded-xl bg-violet-600 px-3 text-xs font-extrabold text-white transition hover:bg-violet-700">Проголосовать <ArrowRight className="h-3.5 w-3.5" /></Link>
       </div>
 
-      {/* Соседи в сети */}
-      <div className="p-4 bg-white rounded-3xl border border-gray-200/80 shadow-xs space-y-3">
-        <div className="flex items-center justify-between text-xs">
-          <span className="font-bold text-gray-900 flex items-center gap-1.5">
-            <Users className="w-4 h-4 text-green-600" /> Соседи онлайн
-          </span>
-          <span className="text-[11px] text-green-600 font-bold">48 в сети</span>
-        </div>
-
-        <div className="flex items-center -space-x-2 overflow-hidden py-1">
-          {["МИ", "АП", "КН", "ОС", "АН", "СМ"].map((initials, idx) => (
-            <div
-              key={idx}
-              className="inline-flex items-center justify-center w-8 h-8 rounded-full ring-2 ring-white bg-green-100 text-green-800 text-[10px] font-bold"
-            >
-              {initials}
-            </div>
-          ))}
-          <div className="inline-flex items-center justify-center w-8 h-8 rounded-full ring-2 ring-white bg-gray-100 text-gray-600 text-[10px] font-bold">
-            +42
-          </div>
-        </div>
+      <div className="rounded-[26px] border border-stone-200/80 bg-white p-4">
+        <p className="flex items-center gap-2 text-xs font-extrabold text-stone-900"><CheckCircle2 className="h-4 w-4 text-green-700" />Сегодня спокойно</p>
+        <p className="mt-2 text-xs leading-5 text-stone-500">Новых аварийных сообщений по вашему дому нет.</p>
       </div>
     </aside>
   );

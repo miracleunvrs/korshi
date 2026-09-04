@@ -24,6 +24,10 @@ complexes → buildings → entrances → apartments → profiles
 profiles → posts → comments / reactions / polls / initiatives / fundraisers
 profiles ↔ chat_members ↔ chats → messages
 profiles → notifications
+profiles → service_requests → notifications
+complexes → house_documents / official_votes / finance_accounts / emergency_alerts
+complexes → home_schedule_items / amenity_resources / visitor_passes
+profiles → amenity_bookings / resident_vehicles
 ```
 
 ## Auth и права
@@ -43,7 +47,7 @@ profiles → notifications
 
 1. `AuthStateSync` слушает изменения auth и realtime таблиц.
 2. `useAppStore.syncAuthState()` получает текущего пользователя и профиль.
-3. `useAppStore.hydrateDomainData()` загружает посты, чаты, сообщения, объявления, заявки и уведомления.
+3. `useAppStore.hydrateDomainData()` загружает посты, чаты, сообщения, объявления, заявки, уведомления, документы, голосования, финансы, аварии и сервисы дома.
 4. Компонент вызывает действие store.
 5. Store вызывает функцию `src/lib/supabase/repository.ts`.
 6. Repository проверяет текущую сессию и пишет через Supabase/RPC.
@@ -75,9 +79,29 @@ Flutter должен использовать те же:
 7. Добавьте realtime, если изменение должно быть видно другим пользователям.
 8. Обновите документацию и прогоните проверки.
 
+### Центр заявок
+
+`service_requests` хранит обращения жителей к управляющей организации. Житель видит собственные и опубликованные для дома заявки, а `hoa_official`, `admin` и назначенный исполнитель — доступные им обращения своего ЖК. Вложения, SLA, события и оценки описаны в `012_service_requests.sql`; клиент не должен подменять `created_by`, `complex_id` или обходить проверку `verified`.
+
+Web подписывается на таблицу через `AuthStateSync`, Flutter загружает данные через `HouseRepository`. При изменении статуса автор получает запись в `notifications`.
+
+### Документы, голосования и финансы
+
+`013_house_documents.sql` хранит версионные документы и подтверждения ознакомления. `014_governance_finance.sql` разделяет официальное решение и обычный опрос: бюллетень голосования создаётся только через `cast_official_vote`, привязан к квартире и после записи не изменяется. Финансовый баланс обновляется функцией `record_finance_transaction`, чтобы операция и итоговая сумма фиксировались одной транзакцией.
+
+### Аварии и сервисы дома
+
+`015_emergency_alerts.sql` хранит официальные аварийные сообщения и подтверждения получения. `016_resident_services.sql` отвечает за календарь, ресурсы, бронирования, пропуска и автомобили. Конфликт времени бронирования проверяет БД. Гостевой пропуск содержит код доступа; QR и открытие шлагбаума не имитируются до подключения реального СКУД.
+
+### Центр уведомлений
+
+Ссылка назначения хранится в `notifications.data`. Клиент проверяет её и открывает соответствующий внутренний маршрут. Пользовательские настройки категорий сейчас локальные; серверная отправка web/mobile push требует настройки OneSignal или другого провайдера по `docs/onesignal-supabase-setup.md`.
+
 ## Новые миграции
 
 Имя миграции должно описывать изменение и иметь следующий номер. Перед `db push` проверьте diff и статус Supabase. Не храните service role key в коде, `.env.local`, логах или коммите.
+
+Актуальный порядок расширений домена: `012_service_requests.sql` → … → `025_membership_context_switch.sql`. Миграции `017`–`025` добавляют мульти-ЖК контекст, роли, white-label, доставку уведомлений, доступ/парковку/работы, сообщество/маркетплейс, расширенные документы/голосования/финансы, AI, инфраструктурные журналы и атомарное переключение объекта.
 
 ## Стиль
 

@@ -3,10 +3,13 @@ node_modules/
 out/
 supabase/.temp/
 strix_runs/
+test-results/
+playwright-report/
 
 .env*
 !.env.example
 !.env.strix.example
+!.env.staging.example
 
 *.tsbuildinfo
 npm-debug.log*

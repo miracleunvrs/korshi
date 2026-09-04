@@ -1,19 +1,20 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  // Brand Greens — hsl(142.1 76.2% 36.3%) → #16A34A
-  static const primary = Color(0xFF16A34A);
-  static const primaryDark = Color(0xFF15803D); // 142.4 71.8% 29.2% (dark ring)
+  // Korshi brand: accessible pine for actions, vivid green for accents.
+  static const primary = Color(0xFF166534);
+  static const primaryDark = Color(0xFF14532D);
   static const primaryLight = Color(0xFFDCFCE7); // green-100
-  static const primaryAccent = Color(0xFF22C55E); // 142.1 70.6% 45.3%
+  static const primaryAccent = Color(0xFF16A34A);
+  static const communityAccent = Color(0xFF7C3AED);
   static const primaryForeground = Colors.white; // hsl 355.7 100% 97.3% → white
   static const primaryForegroundDark = Color(0xFF052E16); // 144.9 80.4% 10%
 
   // Backgrounds & Neutrals — mapped from globals.css
-  static const bgLight = Color(0xFFF8FAFC); // slate-50 (slightly warmer than #fff for scaffold)
-  static const backgroundLight = Colors.white; // 0 0% 100%
-  static const foregroundLight = Color(0xFF020617); // 222.2 84% 4.9% ≈ #020617
-  static const bgCardLight = Colors.white; // 0 0% 100%
+  static const bgLight = Color(0xFFF8F7F2);
+  static const backgroundLight = Color(0xFFFFFEFB);
+  static const foregroundLight = Color(0xFF1C1917);
+  static const bgCardLight = Color(0xFFFFFEFB);
   static const bgDark = Color(0xFF121214);
   static const bgCardDark = Color(0xFF1C1C1E);
   static const backgroundDark = Color(0xFF020617);
@@ -22,12 +23,12 @@ class AppColors {
   static const cardForegroundDark = Color(0xFFF8FAFC);
 
   // Secondary / Muted / Accent — hsl 210 40% 96.1% → #F1F5F9 light, 217.2 32.6% 17.5% → #1E293B dark
-  static const secondaryLight = Color(0xFFF1F5F9);
-  static const secondaryForegroundLight = Color(0xFF0F172A);
-  static const mutedLight = Color(0xFFF1F5F9);
-  static const mutedForegroundLight = Color(0xFF64748B); // 215.4 16.3% 46.9%
-  static const accentLight = Color(0xFFF1F5F9);
-  static const accentForegroundLight = Color(0xFF0F172A);
+  static const secondaryLight = Color(0xFFF0EEEA);
+  static const secondaryForegroundLight = Color(0xFF292524);
+  static const mutedLight = Color(0xFFF0EEEA);
+  static const mutedForegroundLight = Color(0xFF6B625B);
+  static const accentLight = Color(0xFFF0EEEA);
+  static const accentForegroundLight = Color(0xFF292524);
   static const secondaryDark = Color(0xFF1E293B);
   static const secondaryForegroundDark = Color(0xFFF8FAFC);
   static const mutedDark = Color(0xFF1E293B);
@@ -35,10 +36,10 @@ class AppColors {
   static const accentDark = Color(0xFF1E293B);
 
   // Borders & Inputs — 214.3 31.8% 91.4% → #E2E8F0 light
-  static const borderLight = Color(0xFFE2E8F0);
-  static const borderLightSubtle = Color(0xFFF1F5F9); // softer divider as in Flutter before
-  static const inputLight = Color(0xFFE2E8F0);
-  static const ringLight = Color(0xFF16A34A);
+  static const borderLight = Color(0xFFE4E0DB);
+  static const borderLightSubtle = Color(0xFFEDEAE5);
+  static const inputLight = Color(0xFFE4E0DB);
+  static const ringLight = Color(0xFF166534);
   static const borderDark = Color(0xFF1E293B); // 217.2 32.6% 17.5%
   static const inputDark = Color(0xFF1E293B);
   static const ringDark = Color(0xFF15803D);
@@ -61,9 +62,9 @@ class AppColors {
   static const chart5 = Color(0xFFEC4899);
 
   // Text colors (semantic)
-  static const textPrimaryLight = Color(0xFF0F172A);
-  static const textSecondaryLight = Color(0xFF64748B);
-  static const textTertiaryLight = Color(0xFF94A3B8);
+  static const textPrimaryLight = Color(0xFF1C1917);
+  static const textSecondaryLight = Color(0xFF6B625B);
+  static const textTertiaryLight = Color(0xFF9A918A);
   static const textPrimaryDark = Color(0xFFF8FAFC);
   static const textSecondaryDark = Color(0xFF94A3B8);
   static const textTertiaryDark = Color(0xFF64748B);
@@ -95,7 +96,7 @@ class AppColors {
   // Shadows tints
   static const shadowLight = Color(0x0A000000); // 4% as in chat bubbles
   static const shadowMedium = Color(0x14000000);
-  static const primaryShadow = Color(0x4D16A34A); // 30% for FABs
+  static const primaryShadow = Color(0x3D166534);
 
   // Legacy aliases for compatibility
   static const bgLightLegacy = bgLight;

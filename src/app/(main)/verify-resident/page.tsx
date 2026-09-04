@@ -8,6 +8,8 @@ import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { useAppStore } from "@/stores/appStore";
 import { DOCUMENT_UPLOAD_TYPES, validateUploadFile } from "@/lib/uploadLimits";
+import { complexName } from "@/lib/appConfig";
+import { uploadWithRetry } from "@/lib/supabase/uploadWithRetry";
 
 export default function VerifyResidentPage() {
   const router = useRouter();
@@ -31,11 +33,10 @@ export default function VerifyResidentPage() {
         if (validationError) throw new Error(validationError);
 
         const path = `${currentUser.id}/verification/${crypto.randomUUID()}-${document.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-        const { error: uploadError } = await supabase.storage.from("house-media").upload(path, document, {
+        await uploadWithRetry(() => supabase.storage.from("house-media").upload(path, document, {
           contentType: document.type || "application/octet-stream",
           upsert: false,
-        });
-        if (uploadError) throw uploadError;
+        }));
 
         await submitVerificationRequest({
           fullName: currentUser.fullName,
@@ -83,7 +84,7 @@ export default function VerifyResidentPage() {
 
         <div className="space-y-2">
           <h2 className="text-lg font-bold text-gray-900">
-            Подтвердите статус жителя ЖК «Солнечный»
+            Подтвердите статус жителя ЖК «{complexName(currentUser.complexName)}»
           </h2>
           <p className="text-xs text-gray-500 leading-relaxed">
             Для доступа ко всем возможностям закрытого сообщества (чаты подъездов, голосования, инициативы) необходимо подтвердить проживание.

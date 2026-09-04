@@ -15,14 +15,29 @@ import {
   persistClassified,
   persistComment,
   persistFundraiser,
+  persistHouseDocument,
   persistInitiativeSupport,
   persistMessage,
   persistPollVote,
   persistPost,
   persistProfileUpdate,
   persistReaction,
+  persistServiceRequest,
+  persistServiceRequestComment,
+  persistServiceRequestRating,
+  persistServiceRequestReopen,
+  persistServiceRequestStatus,
+  persistDocumentAcknowledgement,
+  persistDocumentArchive,
+  persistOfficialVoteChoice,
+  persistEmergencyAlert,
+  persistEmergencyAcknowledgement,
   removeReaction,
   recordFundraiserPayment,
+  recordFinanceTransaction,
+  persistAmenityBooking,
+  persistVisitorPass,
+  persistResidentVehicle,
   reviewVerificationRequest,
   submitVerificationRequest as submitVerificationRequestRemote,
 } from "@/lib/supabase/repository";
@@ -39,6 +54,8 @@ export interface UserAccount {
   roleLabel: string;
   buildingNumber: string;
   complexId?: string;
+  complexName?: string;
+  complexAddress?: string;
   buildingId?: string;
   entranceId?: string;
   entranceNumber: number;
@@ -91,6 +108,7 @@ export interface AppNotification {
   type: string;
   title: string;
   body: string;
+  data?: Record<string, unknown>;
   isRead: boolean;
   createdAt: string;
 }
@@ -106,6 +124,182 @@ export interface ClassifiedItem {
   authorId: string;
   authorName: string;
   authorPhone: string;
+  createdAt: string;
+}
+
+export type ServiceRequestStatus = "submitted" | "in_progress" | "resolved" | "closed";
+export type ServiceRequestPriority = "normal" | "important" | "emergency";
+export type ServiceRequestCategory = "utilities" | "cleaning" | "repair" | "safety" | "territory" | "other";
+
+export interface ServiceRequestItem {
+  id: string;
+  userId: string;
+  complexId: string;
+  category: ServiceRequestCategory;
+  title: string;
+  description: string;
+  location: string;
+  status: ServiceRequestStatus;
+  priority: ServiceRequestPriority;
+  publicForComplex: boolean;
+  assigneeName?: string;
+  slaDueAt?: string;
+  resolutionNote?: string;
+  rating?: number;
+  attachments: ServiceRequestAttachment[];
+  events: ServiceRequestEvent[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ServiceRequestAttachment {
+  id: string;
+  url: string;
+  name: string;
+  mimeType: string;
+  sizeBytes: number;
+  kind: "evidence" | "resolution";
+}
+
+export interface ServiceRequestEvent {
+  id: string;
+  kind: "created" | "comment" | "assigned" | "status_changed" | "resolution" | "rated" | "reopened";
+  actorName: string;
+  actorRole?: UserRole;
+  message?: string;
+  createdAt: string;
+}
+
+export type HouseDocumentCategory = "finance" | "protocol" | "rules" | "contract" | "notice" | "report" | "other";
+
+export interface HouseDocument {
+  id: string;
+  complexId: string;
+  title: string;
+  description: string;
+  category: HouseDocumentCategory;
+  version: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  url?: string;
+  isImportant: boolean;
+  requiresAcknowledgement: boolean;
+  acknowledged: boolean;
+  status: "active" | "archived";
+  publishedBy: string;
+  publishedAt: string;
+  searchableText?: string;
+  scopeLabel?: string;
+}
+
+export type OfficialVoteChoice = "yes" | "no" | "abstain";
+
+export interface OfficialVoteItem {
+  id: string;
+  complexId: string;
+  title: string;
+  description: string;
+  basis: "owner" | "area";
+  quorumPercent: number;
+  participationPercent: number;
+  eligibleUnits: number;
+  eligibleWeight: number;
+  status: "draft" | "active" | "completed" | "cancelled";
+  startsAt: string;
+  endsAt: string;
+  results: Record<OfficialVoteChoice, number>;
+  userChoice?: OfficialVoteChoice;
+  protocolUrl?: string;
+}
+
+export interface FinanceTransaction {
+  id: string;
+  direction: "income" | "expense";
+  category: string;
+  title: string;
+  amount: number;
+  occurredOn: string;
+  documentId?: string;
+}
+
+export interface FinanceBudgetItem {
+  id: string;
+  category: string;
+  planned: number;
+  actual: number;
+}
+
+export interface FinanceOverview {
+  balance: number;
+  income: number;
+  expense: number;
+  currency: "KZT";
+  transactions: FinanceTransaction[];
+  budget: FinanceBudgetItem[];
+}
+
+export interface HomeScheduleItem {
+  id: string;
+  kind: "cleaning" | "maintenance" | "outage" | "event";
+  title: string;
+  description: string;
+  location: string;
+  startsAt: string;
+  endsAt?: string;
+  status: "planned" | "in_progress" | "completed" | "cancelled";
+}
+
+export interface AmenityResource {
+  id: string;
+  name: string;
+  description: string;
+  location: string;
+  capacity?: number;
+  price: number;
+  kind?: "room" | "sport" | "bbq" | "freight_lift" | "parking";
+  rules?: string;
+  requiresApproval?: boolean;
+}
+
+export interface AmenityBooking {
+  id: string;
+  resourceId: string;
+  startsAt: string;
+  endsAt: string;
+  status: "confirmed" | "cancelled" | "completed";
+  approvalStatus?: "pending" | "approved" | "rejected";
+  paymentStatus?: "not_required" | "pending" | "paid";
+}
+
+export interface VisitorPass {
+  id: string;
+  guestName: string;
+  kind: "guest" | "courier" | "vehicle";
+  vehiclePlate?: string;
+  accessCode: string;
+  validFrom: string;
+  validUntil: string;
+  status: "active" | "used" | "revoked" | "expired";
+}
+
+export interface ResidentVehicle {
+  id: string;
+  plate: string;
+  label: string;
+}
+
+export type NotificationPreferenceKey = "requests" | "community" | "finance" | "emergency";
+
+export interface EmergencyAlert {
+  id: string;
+  title: string;
+  message: string;
+  affectedAreas: string[];
+  expectedResolution?: string;
+  contactPhone?: string;
+  active: boolean;
+  acknowledged: boolean;
   createdAt: string;
 }
 
@@ -207,6 +401,9 @@ function accountFromAuthMetadata(user: User): UserAccount {
     role,
     roleLabel: roleLabel(role, buildingNumber),
     buildingNumber,
+    complexId: String(metadata.complex_id || "") || undefined,
+    complexName: String(metadata.complex_name || "") || undefined,
+    complexAddress: String(metadata.complex_address || "") || undefined,
     entranceNumber: Number(metadata.entrance_number) || 1,
     apartmentNumber: String(metadata.apartment_number || ""),
     verified: false,
@@ -219,12 +416,12 @@ async function loadAccount(user: User): Promise<UserAccount> {
   const fallback = accountFromAuthMetadata(user);
   const profileResult = await supabase
     .from("profiles")
-    .select("id, phone, full_name, avatar_url, role, apartment_id, verified, bio")
+    .select("id, phone, full_name, avatar_url, role, apartment_id, complex_id, verified, bio")
     .eq("id", user.id)
     .maybeSingle();
   const profile = profileResult.data as Pick<
     Database["public"]["Tables"]["profiles"]["Row"],
-    "id" | "phone" | "full_name" | "avatar_url" | "role" | "apartment_id" | "verified" | "bio"
+    "id" | "phone" | "full_name" | "avatar_url" | "role" | "apartment_id" | "complex_id" | "verified" | "bio"
   > | null;
 
   if (profileResult.error) throw profileResult.error;
@@ -233,6 +430,21 @@ async function loadAccount(user: User): Promise<UserAccount> {
   let buildingNumber = fallback.buildingNumber;
   let entranceNumber = fallback.entranceNumber;
   let apartmentNumber = fallback.apartmentNumber;
+  let currentComplexName = fallback.complexName;
+  let currentComplexAddress = fallback.complexAddress;
+
+  if (profile.complex_id) {
+    const complexResult = await supabase
+      .from("complexes")
+      .select("name, address, city")
+      .eq("id", profile.complex_id)
+      .maybeSingle();
+    const complexData = complexResult.data as { name: string; address: string; city: string } | null;
+    if (complexData) {
+      currentComplexName = complexData.name;
+      currentComplexAddress = [complexData.city, complexData.address].filter(Boolean).join(", ");
+    }
+  }
 
   if (profile.apartment_id) {
     const apartmentResult = await supabase
@@ -281,6 +493,9 @@ async function loadAccount(user: User): Promise<UserAccount> {
     role: profile.role,
     roleLabel: roleLabel(profile.role, buildingNumber),
     buildingNumber,
+    complexId: profile.complex_id || undefined,
+    complexName: currentComplexName,
+    complexAddress: currentComplexAddress,
     entranceNumber,
     apartmentNumber,
     verified: profile.verified,
@@ -330,16 +545,52 @@ export interface AppState {
   hydrateDomainData: () => Promise<void>;
   notifications: AppNotification[];
   markNotificationRead: (notificationId: string) => Promise<void>;
+  markAllNotificationsRead: () => Promise<void>;
+  notificationPreferences: Record<NotificationPreferenceKey, boolean>;
+  setNotificationPreference: (key: NotificationPreferenceKey, enabled: boolean) => void;
+
+  // Заявки в управляющую организацию
+  serviceRequests: ServiceRequestItem[];
+  createServiceRequest: (
+    data: Pick<ServiceRequestItem, "category" | "title" | "description" | "location" | "priority" | "publicForComplex">,
+    files?: File[],
+  ) => Promise<void>;
+  addServiceRequestComment: (requestId: string, message: string) => Promise<void>;
+  rateServiceRequest: (requestId: string, rating: number) => Promise<void>;
+  reopenServiceRequest: (requestId: string, message: string) => Promise<void>;
+  updateServiceRequestStatus: (
+    requestId: string,
+    status: ServiceRequestStatus,
+    options?: { note?: string; assigneeName?: string; slaDueAt?: string },
+  ) => Promise<void>;
+
+  // Документы дома
+  documents: HouseDocument[];
+  addHouseDocument: (
+    data: Pick<HouseDocument, "title" | "description" | "category" | "version" | "isImportant" | "requiresAcknowledgement">,
+    file: File,
+  ) => Promise<void>;
+  acknowledgeDocument: (documentId: string) => Promise<void>;
+  archiveDocument: (documentId: string) => Promise<void>;
+
+  // Управление домом и прозрачные финансы
+  officialVotes: OfficialVoteItem[];
+  castOfficialVote: (voteId: string, choice: OfficialVoteChoice) => Promise<void>;
+  finance: FinanceOverview;
+  addFinanceTransaction: (data: Omit<FinanceTransaction, "id">) => Promise<void>;
+  scheduleItems: HomeScheduleItem[];
+  amenityResources: AmenityResource[];
+  amenityBookings: AmenityBooking[];
+  visitorPasses: VisitorPass[];
+  residentVehicles: ResidentVehicle[];
+  createAmenityBooking: (resourceId: string, startsAt: string, endsAt: string) => Promise<void>;
+  createVisitorPass: (data: Pick<VisitorPass, "guestName" | "kind" | "vehiclePlate" | "validUntil">) => Promise<void>;
+  addResidentVehicle: (plate: string, label: string) => Promise<void>;
 
   // Экстренные оповещения ОСИ
-  urgentAlert: {
-    id: string;
-    title: string;
-    message: string;
-    active: boolean;
-    createdAt: string;
-  } | null;
-  setUrgentAlert: (alert: AppState["urgentAlert"]) => void;
+  urgentAlert: EmergencyAlert | null;
+  setUrgentAlert: (alert: EmergencyAlert | null) => Promise<void>;
+  acknowledgeUrgentAlert: () => Promise<void>;
 
   // Заявки на верификацию
   verificationRequests: VerificationRequest[];
@@ -393,7 +644,213 @@ export const useAppStore = create<AppState>()(
       isAuthLoading: isSupabaseConfigured(),
       supabaseUserId: null,
       backendError: null,
-      notifications: [],
+      notifications: [
+        {
+          id: "notification-request-demo",
+          type: "service_request",
+          title: "Заявка принята в работу",
+          body: "Служба эксплуатации назначена на заявку «Не работает освещение на этаже».",
+          data: { service_request_id: "service-request-1" },
+          isRead: false,
+          createdAt: "Сегодня, 10:05",
+        },
+        {
+          id: "notification-vote-demo",
+          type: "vote",
+          title: "Голосование завершится завтра",
+          body: "Успейте принять участие в решении по благоустройству двора.",
+          data: { post_id: "post-3" },
+          isRead: false,
+          createdAt: "Сегодня, 09:00",
+        },
+        {
+          id: "notification-document-demo",
+          type: "document",
+          title: "Опубликован отчёт ОСИ",
+          body: "Финансовый отчёт за август доступен в центре документов.",
+          data: { document_id: "document-1" },
+          isRead: true,
+          createdAt: "Вчера, 18:20",
+        },
+      ],
+      notificationPreferences: {
+        requests: true,
+        community: true,
+        finance: true,
+        emergency: true,
+      },
+      setNotificationPreference: (key, enabled) => set((state) => ({
+        notificationPreferences: { ...state.notificationPreferences, [key]: enabled },
+      })),
+      serviceRequests: [
+        {
+          id: "service-request-1",
+          userId: "user-1",
+          complexId: "complex-1",
+          category: "repair",
+          title: "Не работает освещение на этаже",
+          description: "Лампа возле лифта не включается второй день.",
+          location: "Дом 2 · подъезд 1 · 7 этаж",
+          status: "in_progress",
+          priority: "normal",
+          publicForComplex: true,
+          assigneeName: "Служба эксплуатации",
+          slaDueAt: "Сегодня, 18:00",
+          attachments: [],
+          events: [
+            { id: "request-event-1", kind: "created", actorName: "Мария Иванова", message: "Лампа возле лифта не включается второй день.", createdAt: "Сегодня, 09:20" },
+            { id: "request-event-2", kind: "assigned", actorName: "ОСИ «Солнечный»", message: "Назначена служба эксплуатации", createdAt: "Сегодня, 10:05" },
+          ],
+          createdAt: "Сегодня, 09:20",
+          updatedAt: "Сегодня, 10:05",
+        },
+        {
+          id: "service-request-2",
+          userId: "user-1",
+          complexId: "complex-1",
+          category: "cleaning",
+          title: "Уборка входной группы",
+          description: "После доставки осталась упаковка у входа.",
+          location: "Дом 2 · подъезд 1",
+          status: "resolved",
+          priority: "normal",
+          publicForComplex: false,
+          assigneeName: "Клининг",
+          resolutionNote: "Входная группа очищена, упаковка вывезена.",
+          attachments: [],
+          events: [
+            { id: "request-event-3", kind: "created", actorName: "Мария Иванова", createdAt: "Вчера, 17:42" },
+            { id: "request-event-4", kind: "resolution", actorName: "Клининг", message: "Уборка выполнена", createdAt: "Сегодня, 08:10" },
+          ],
+          createdAt: "Вчера, 17:42",
+          updatedAt: "Сегодня, 08:10",
+        },
+      ],
+      documents: [
+        {
+          id: "document-1",
+          complexId: "complex-1",
+          title: "Финансовый отчёт за август",
+          description: "Поступления, обязательные расходы и остаток средств ОСИ за месяц.",
+          category: "finance",
+          version: "1.0",
+          fileName: "finance-august.pdf",
+          mimeType: "application/pdf",
+          sizeBytes: 824000,
+          isImportant: true,
+          requiresAcknowledgement: false,
+          acknowledged: false,
+          status: "active",
+          publishedBy: "ОСИ «Солнечный»",
+          publishedAt: "Вчера, 18:20",
+        },
+        {
+          id: "document-2",
+          complexId: "complex-1",
+          title: "Правила пожарной безопасности",
+          description: "Порядок действий при пожаре и требования к эвакуационным выходам.",
+          category: "rules",
+          version: "2.1",
+          fileName: "fire-safety.pdf",
+          mimeType: "application/pdf",
+          sizeBytes: 462000,
+          isImportant: true,
+          requiresAcknowledgement: true,
+          acknowledged: false,
+          status: "active",
+          publishedBy: "ОСИ «Солнечный»",
+          publishedAt: "2 сентября, 12:10",
+        },
+        {
+          id: "document-3",
+          complexId: "complex-1",
+          title: "Протокол собрания №8",
+          description: "Решения по освещению паркинга и графику обслуживания лифтов.",
+          category: "protocol",
+          version: "1.0",
+          fileName: "protocol-08.pdf",
+          mimeType: "application/pdf",
+          sizeBytes: 1130000,
+          isImportant: false,
+          requiresAcknowledgement: false,
+          acknowledged: false,
+          status: "active",
+          publishedBy: "ОСИ «Солнечный»",
+          publishedAt: "28 августа, 16:40",
+        },
+      ],
+      officialVotes: [
+        {
+          id: "official-vote-1",
+          complexId: "complex-1",
+          title: "Благоустройство детской площадки",
+          description: "Утвердить смету 4 800 000 ₸ на безопасное покрытие, освещение и новое игровое оборудование.",
+          basis: "area",
+          quorumPercent: 51,
+          participationPercent: 46,
+          eligibleUnits: 120,
+          eligibleWeight: 12000,
+          status: "active",
+          startsAt: "1 сентября, 09:00",
+          endsAt: "6 сентября, 21:00",
+          results: { yes: 4200, no: 840, abstain: 480 },
+        },
+        {
+          id: "official-vote-2",
+          complexId: "complex-1",
+          title: "График обслуживания лифтов",
+          description: "Утверждение годового договора на техническое обслуживание лифтового оборудования.",
+          basis: "owner",
+          quorumPercent: 51,
+          participationPercent: 68,
+          eligibleUnits: 120,
+          eligibleWeight: 120,
+          status: "completed",
+          startsAt: "12 августа, 09:00",
+          endsAt: "19 августа, 21:00",
+          results: { yes: 70, no: 8, abstain: 4 },
+          userChoice: "yes",
+        },
+      ],
+      finance: {
+        balance: 2142500,
+        income: 3680000,
+        expense: 1537500,
+        currency: "KZT",
+        budget: [
+          { id: "budget-1", category: "Содержание дома", planned: 9600000, actual: 6210000 },
+          { id: "budget-2", category: "Лифты", planned: 3200000, actual: 2440000 },
+          { id: "budget-3", category: "Благоустройство", planned: 4800000, actual: 1180000 },
+          { id: "budget-4", category: "Безопасность", planned: 2100000, actual: 1370000 },
+        ],
+        transactions: [
+          { id: "finance-1", direction: "income", category: "Взносы", title: "Ежемесячные взносы жителей", amount: 3680000, occurredOn: "2 сентября" },
+          { id: "finance-2", direction: "expense", category: "Лифты", title: "Техническое обслуживание", amount: 620000, occurredOn: "3 сентября", documentId: "document-1" },
+          { id: "finance-3", direction: "expense", category: "Уборка", title: "Клининг общих зон", amount: 487500, occurredOn: "2 сентября" },
+          { id: "finance-4", direction: "expense", category: "Безопасность", title: "Обслуживание камер", amount: 430000, occurredOn: "1 сентября" },
+        ],
+      },
+      scheduleItems: [
+        { id: "schedule-1", kind: "outage", title: "Отключение холодной воды", description: "Замена насосного оборудования", location: "Дом 1 и Дом 2", startsAt: "Завтра, 10:00", endsAt: "Завтра, 14:00", status: "planned" },
+        { id: "schedule-2", kind: "maintenance", title: "Обслуживание лифтов", description: "Проверка датчиков безопасности", location: "Дом 2 · подъезд 1", startsAt: "6 сентября, 09:00", endsAt: "6 сентября, 12:00", status: "planned" },
+        { id: "schedule-3", kind: "cleaning", title: "Уборка паркинга", description: "Механизированная уборка уровня −1", location: "Паркинг", startsAt: "8 сентября, 08:00", endsAt: "8 сентября, 11:00", status: "planned" },
+      ],
+      amenityResources: [
+        { id: "resource-1", name: "Переговорная ОСИ", description: "Комната для собраний и занятий", location: "Дом 1 · 1 этаж", capacity: 12, price: 0, kind: "room", rules: "До 2 часов в день", requiresApproval: false },
+        { id: "resource-2", name: "Мангальная зона", description: "Закрытая дворовая зона со столом", location: "Внутренний двор", capacity: 8, price: 3000, kind: "bbq", rules: "Убрать территорию после использования", requiresApproval: true },
+        { id: "resource-3", name: "Грузовой лифт", description: "Бронирование для переезда", location: "Выбранный подъезд", price: 0, kind: "freight_lift", rules: "Защитные панели устанавливает консьерж", requiresApproval: true },
+        { id: "resource-4", name: "Спортивная площадка", description: "Мини-футбол и тренировки", location: "Южный двор", capacity: 16, price: 0, kind: "sport", rules: "Не более 90 минут", requiresApproval: false },
+        { id: "resource-5", name: "Гостевое парковочное место", description: "Краткосрочная парковка для гостей", location: "Северный въезд", price: 500, kind: "parking", rules: "До 8 часов", requiresApproval: false },
+      ],
+      amenityBookings: [
+        { id: "booking-1", resourceId: "resource-1", startsAt: "7 сентября, 18:00", endsAt: "7 сентября, 19:30", status: "confirmed" },
+      ],
+      visitorPasses: [
+        { id: "pass-1", guestName: "Александр · курьер", kind: "courier", accessCode: "K7P4-28Q", validFrom: "Сегодня, 14:00", validUntil: "Сегодня, 16:00", status: "active" },
+      ],
+      residentVehicles: [
+        { id: "vehicle-1", plate: "777 ABC 02", label: "Белая Toyota" },
+      ],
 
       markNotificationRead: async (notificationId) => {
         if (isSupabaseConfigured()) {
@@ -422,6 +879,16 @@ export const useAppStore = create<AppState>()(
             verificationRequests: data.verificationRequests,
             postComments: data.postComments,
             notifications: data.notifications,
+            serviceRequests: data.serviceRequests,
+            documents: data.documents,
+            officialVotes: data.officialVotes,
+            finance: data.finance,
+            urgentAlert: data.urgentAlert,
+            scheduleItems: data.scheduleItems,
+            amenityResources: data.amenityResources,
+            amenityBookings: data.amenityBookings,
+            visitorPasses: data.visitorPasses,
+            residentVehicles: data.residentVehicles,
             backendError: null,
           });
         } catch (error) {
@@ -582,11 +1049,255 @@ export const useAppStore = create<AppState>()(
         id: "alert-1",
         title: "Плановое отключение холодной воды",
         message: "Завтра с 10:00 до 14:00 в Доме 1 и Доме 2 в связи с заменой насосного оборудования.",
+        affectedAreas: ["Дом 1", "Дом 2"],
+        expectedResolution: "Завтра, 14:00",
+        contactPhone: "+7 (727) 123-45-67",
         active: true,
+        acknowledged: false,
         createdAt: "Сегодня в 09:00",
       },
 
-      setUrgentAlert: (alert) => set({ urgentAlert: alert }),
+      setUrgentAlert: async (alert) => {
+        const remote = await persistEmergencyAlert(alert, get().urgentAlert?.id);
+        set({ urgentAlert: remote || alert });
+      },
+
+      acknowledgeUrgentAlert: async () => {
+        const alert = get().urgentAlert;
+        if (!alert) return;
+        await persistEmergencyAcknowledgement(alert.id);
+        set({ urgentAlert: { ...alert, acknowledged: true } });
+      },
+
+      createServiceRequest: async (data, files = []) => {
+        const state = get();
+        const request = await persistServiceRequest(data, files);
+        const now = new Date();
+        const localRequest: ServiceRequestItem = request || {
+          id: `service-request-${Date.now()}`,
+          userId: state.currentUser.id,
+          complexId: state.currentUser.complexId || "complex-1",
+          ...data,
+          status: "submitted",
+          attachments: files.map((file, index) => ({
+            id: `local-attachment-${Date.now()}-${index}`,
+            url: URL.createObjectURL(file),
+            name: file.name,
+            mimeType: file.type,
+            sizeBytes: file.size,
+            kind: "evidence",
+          })),
+          events: [{
+            id: `local-event-${Date.now()}`,
+            kind: "created",
+            actorName: state.currentUser.fullName,
+            actorRole: state.currentUser.role,
+            message: data.description,
+            createdAt: now.toLocaleString("ru-RU"),
+          }],
+          createdAt: now.toLocaleString("ru-RU"),
+          updatedAt: now.toLocaleString("ru-RU"),
+        };
+        set((current) => ({
+          serviceRequests: [localRequest, ...current.serviceRequests],
+          backendError: null,
+        }));
+      },
+
+      addServiceRequestComment: async (requestId, message) => {
+        const text = message.trim();
+        if (!text) return;
+        await persistServiceRequestComment(requestId, text);
+        const state = get();
+        const now = new Date().toLocaleString("ru-RU");
+        set((current) => ({
+          serviceRequests: current.serviceRequests.map((request) => request.id === requestId ? {
+            ...request,
+            updatedAt: now,
+            events: [...request.events, {
+              id: `local-event-${Date.now()}`,
+              kind: "comment",
+              actorName: state.currentUser.fullName,
+              actorRole: state.currentUser.role,
+              message: text,
+              createdAt: now,
+            }],
+          } : request),
+        }));
+      },
+
+      rateServiceRequest: async (requestId, rating) => {
+        await persistServiceRequestRating(requestId, rating);
+        const state = get();
+        const now = new Date().toLocaleString("ru-RU");
+        set((current) => ({
+          serviceRequests: current.serviceRequests.map((request) => request.id === requestId ? {
+            ...request,
+            status: "closed",
+            rating,
+            updatedAt: now,
+            events: [...request.events, {
+              id: `local-event-${Date.now()}`,
+              kind: "rated",
+              actorName: state.currentUser.fullName,
+              actorRole: state.currentUser.role,
+              message: `Оценка: ${rating} из 5`,
+              createdAt: now,
+            }],
+          } : request),
+        }));
+      },
+
+      reopenServiceRequest: async (requestId, message) => {
+        await persistServiceRequestReopen(requestId, message);
+        const state = get();
+        const now = new Date().toLocaleString("ru-RU");
+        set((current) => ({
+          serviceRequests: current.serviceRequests.map((request) => request.id === requestId ? {
+            ...request,
+            status: "submitted",
+            rating: undefined,
+            updatedAt: now,
+            events: [...request.events, {
+              id: `local-event-${Date.now()}`,
+              kind: "reopened",
+              actorName: state.currentUser.fullName,
+              actorRole: state.currentUser.role,
+              message: message.trim() || "Требуется дополнительная работа",
+              createdAt: now,
+            }],
+          } : request),
+        }));
+      },
+
+      updateServiceRequestStatus: async (requestId, status, options = {}) => {
+        await persistServiceRequestStatus(requestId, status, options.note, options.assigneeName, options.slaDueAt);
+        const state = get();
+        const now = new Date().toLocaleString("ru-RU");
+        set((current) => ({
+          serviceRequests: current.serviceRequests.map((request) => request.id === requestId ? {
+            ...request,
+            status,
+            assigneeName: options.assigneeName || request.assigneeName,
+            slaDueAt: options.slaDueAt || request.slaDueAt,
+            resolutionNote: status === "resolved" ? options.note || request.resolutionNote : request.resolutionNote,
+            updatedAt: now,
+            events: [...request.events, {
+              id: `local-event-${Date.now()}`,
+              kind: status === "resolved" ? "resolution" : "status_changed",
+              actorName: state.currentUser.fullName,
+              actorRole: state.currentUser.role,
+              message: options.note,
+              createdAt: now,
+            }],
+          } : request),
+        }));
+      },
+
+      addHouseDocument: async (data, file) => {
+        const state = get();
+        const remote = await persistHouseDocument(data, file);
+        const document: HouseDocument = remote || {
+          id: `document-${Date.now()}`,
+          complexId: state.currentUser.complexId || "complex-1",
+          ...data,
+          fileName: file.name,
+          mimeType: file.type,
+          sizeBytes: file.size,
+          url: URL.createObjectURL(file),
+          acknowledged: false,
+          status: "active",
+          publishedBy: state.currentUser.fullName,
+          publishedAt: new Date().toLocaleString("ru-RU"),
+        };
+        set((current) => ({ documents: [document, ...current.documents] }));
+      },
+
+      acknowledgeDocument: async (documentId) => {
+        await persistDocumentAcknowledgement(documentId);
+        set((state) => ({
+          documents: state.documents.map((document) => document.id === documentId ? { ...document, acknowledged: true } : document),
+        }));
+      },
+
+      archiveDocument: async (documentId) => {
+        await persistDocumentArchive(documentId);
+        set((state) => ({
+          documents: state.documents.map((document) => document.id === documentId ? { ...document, status: "archived" } : document),
+        }));
+      },
+
+      castOfficialVote: async (voteId, choice) => {
+        const remoteBallot = await persistOfficialVoteChoice(voteId, choice);
+        set((state) => ({
+          officialVotes: state.officialVotes.map((vote) => {
+            if (vote.id !== voteId || vote.userChoice) return vote;
+            const fallbackWeight = vote.basis === "area"
+              ? vote.eligibleWeight / Math.max(1, vote.eligibleUnits)
+              : 1;
+            const ballotWeight = Number(remoteBallot?.weight || fallbackWeight);
+            const eligibleWeight = vote.basis === "area" ? vote.eligibleWeight : vote.eligibleUnits;
+            return {
+              ...vote,
+              userChoice: choice,
+              participationPercent: Math.min(100, vote.participationPercent + ((ballotWeight / Math.max(1, eligibleWeight)) * 100)),
+              results: { ...vote.results, [choice]: vote.results[choice] + ballotWeight },
+            };
+          }),
+        }));
+      },
+
+      addFinanceTransaction: async (data) => {
+        const remote = await recordFinanceTransaction(data);
+        const transaction: FinanceTransaction = remote || { ...data, id: `finance-${Date.now()}` };
+        set((state) => ({
+          finance: {
+            ...state.finance,
+            balance: state.finance.balance + (transaction.direction === "income" ? transaction.amount : -transaction.amount),
+            income: state.finance.income + (transaction.direction === "income" ? transaction.amount : 0),
+            expense: state.finance.expense + (transaction.direction === "expense" ? transaction.amount : 0),
+            transactions: [transaction, ...state.finance.transactions],
+          },
+        }));
+      },
+
+      createAmenityBooking: async (resourceId, startsAt, endsAt) => {
+        const remote = await persistAmenityBooking(resourceId, startsAt, endsAt);
+        const booking: AmenityBooking = remote || { id: `booking-${Date.now()}`, resourceId, startsAt, endsAt, status: "confirmed" };
+        set((state) => ({ amenityBookings: [booking, ...state.amenityBookings] }));
+      },
+
+      createVisitorPass: async (data) => {
+        const remote = await persistVisitorPass(data);
+        const now = new Date().toLocaleString("ru-RU");
+        const pass: VisitorPass = remote || {
+          id: `pass-${Date.now()}`,
+          ...data,
+          accessCode: crypto.randomUUID().slice(0, 8).toUpperCase(),
+          validFrom: now,
+          status: "active",
+        };
+        set((state) => ({ visitorPasses: [pass, ...state.visitorPasses] }));
+      },
+
+      addResidentVehicle: async (plate, label) => {
+        const remote = await persistResidentVehicle(plate, label);
+        const vehicle: ResidentVehicle = remote || { id: `vehicle-${Date.now()}`, plate, label };
+        set((state) => ({ residentVehicles: [vehicle, ...state.residentVehicles] }));
+      },
+
+      markAllNotificationsRead: async () => {
+        if (isSupabaseConfigured()) {
+          const { error } = await (createClient() as any)
+            .from("notifications")
+            .update({ is_read: true })
+            .eq("is_read", false);
+          if (error) throw error;
+        }
+        set((state) => ({
+          notifications: state.notifications.map((notification) => ({ ...notification, isRead: true })),
+        }));
+      },
 
       verificationRequests: [
         {
@@ -1345,7 +2056,7 @@ export const useAppStore = create<AppState>()(
       },
     }),
     {
-      name: "housesm-store-v3",
+      name: "housesm-store-v4",
       partialize: (state) => ({
         currentUser: state.currentUser,
         registeredUsers: state.registeredUsers,
@@ -1355,6 +2066,17 @@ export const useAppStore = create<AppState>()(
         classifieds: state.classifieds,
         postComments: state.postComments,
         verificationRequests: state.verificationRequests,
+        serviceRequests: state.serviceRequests,
+        documents: state.documents,
+        officialVotes: state.officialVotes,
+        finance: state.finance,
+        scheduleItems: state.scheduleItems,
+        amenityResources: state.amenityResources,
+        amenityBookings: state.amenityBookings,
+        visitorPasses: state.visitorPasses,
+        residentVehicles: state.residentVehicles,
+        urgentAlert: state.urgentAlert,
+        notificationPreferences: state.notificationPreferences,
       }),
       merge: (persistedState, currentState) => ({
         ...currentState,

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import NextImage from "next/image";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import { 
@@ -29,6 +30,7 @@ interface PostCardProps {
 export default function PostCard({ post, onVote, onSupportInitiative, onLike, onUnlike, onDelete }: PostCardProps) {
   const [isLiked, setIsLiked] = useState(false);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [shareState, setShareState] = useState<"idle" | "done">("idle");
 
   const territoryBadge = {
     complex: "Весь ЖК",
@@ -43,14 +45,26 @@ export default function PostCard({ post, onVote, onSupportInitiative, onLike, on
     timeAgo = 'недавно';
   }
 
+  const sharePost = async () => {
+    const url = `${window.location.origin}/feed/${post.id}`;
+    try {
+      if (navigator.share) await navigator.share({ title: post.title || "Публикация в Korshi", text: post.content, url });
+      else await navigator.clipboard.writeText(url);
+      setShareState("done");
+      window.setTimeout(() => setShareState("idle"), 1800);
+    } catch {
+      // Пользователь мог закрыть системный диалог — это не ошибка публикации.
+    }
+  };
+
   return (
-    <article className="bg-white border-b border-gray-100 p-4 space-y-3">
+    <article className="reveal-up space-y-3 border-b border-stone-200/80 bg-[#fffefb] p-4 sm:p-5">
       {/* Шапка карточки: автор, статус, меню */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center text-green-700 font-semibold overflow-hidden shrink-0">
+          <div className="relative w-10 h-10 rounded-full bg-green-50 flex items-center justify-center text-green-700 font-semibold overflow-hidden shrink-0">
             {post.author?.avatar_url ? (
-              <img src={post.author.avatar_url} alt={post.author.full_name || ""} className="w-full h-full object-cover" />
+              <NextImage src={post.author.avatar_url} alt={post.author.full_name || ""} fill sizes="40px" unoptimized className="object-cover" />
             ) : (
               <span>{post.author?.full_name?.charAt(0) || "U"}</span>
             )}
@@ -58,7 +72,7 @@ export default function PostCard({ post, onVote, onSupportInitiative, onLike, on
           <div>
             <div className="flex items-center gap-1.5">
               <span className="font-semibold text-sm text-gray-900 leading-tight">
-                {post.is_official ? `ОСИ «Солнечный»` : (post.author?.full_name || "Сосед")}
+                {post.author?.full_name || (post.is_official ? "Управление ЖК" : "Сосед")}
               </span>
               {post.is_official && (
                 <ShieldCheck className="w-4 h-4 text-green-600 inline shrink-0" />
@@ -67,7 +81,7 @@ export default function PostCard({ post, onVote, onSupportInitiative, onLike, on
                 <CheckCircle2 className="w-3.5 h-3.5 text-green-600 inline shrink-0" />
               )}
             </div>
-            <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5">
+            <div className="mt-0.5 flex items-center gap-2 text-xs text-gray-600">
               <span>{territoryBadge}</span>
               <span>•</span>
               <span>
@@ -83,7 +97,7 @@ export default function PostCard({ post, onVote, onSupportInitiative, onLike, on
           </span>
           {onDelete && (
             <button
-              className="text-gray-400 p-1 hover:text-gray-600"
+              className="p-1 text-gray-600 hover:text-gray-800"
               aria-label="Снять публикацию"
               onClick={() => {
                 if (window.confirm("Снять эту публикацию? Она исчезнет из ленты.")) onDelete(post.id);
@@ -111,7 +125,7 @@ export default function PostCard({ post, onVote, onSupportInitiative, onLike, on
       {post.attachments && post.attachments.length > 0 && (
         <div className="rounded-xl overflow-hidden grid gap-1 mt-2">
           {post.attachments.map((att) => (
-            <img key={att.id} src={att.url} alt={att.name || "Фото"} className="w-full max-h-80 object-cover rounded-xl" />
+            <NextImage key={att.id} src={att.url} alt={att.name || "Фото"} width={1200} height={800} sizes="(max-width: 768px) 100vw, 768px" unoptimized className="h-auto w-full max-h-80 object-cover rounded-xl" />
           ))}
         </div>
       )}
@@ -140,7 +154,7 @@ export default function PostCard({ post, onVote, onSupportInitiative, onLike, on
                 />
                 <div className="relative flex justify-between items-center text-xs font-medium z-10">
                   <span className="text-gray-900">{option.text}</span>
-                  <span className="text-gray-500">{percent}%</span>
+                  <span className="text-gray-600">{percent}%</span>
                 </div>
               </button>
             );
@@ -149,7 +163,7 @@ export default function PostCard({ post, onVote, onSupportInitiative, onLike, on
           <button
             onClick={() => selectedOption && onVote && post.poll && onVote(post.poll.id, selectedOption)}
             disabled={!selectedOption}
-            className="w-full mt-2 py-2.5 bg-green-600 disabled:opacity-50 text-white font-medium text-xs rounded-xl shadow-sm hover:bg-green-700 transition"
+            className="mt-2 w-full rounded-xl bg-green-700 py-2.5 text-xs font-medium text-white shadow-sm transition hover:bg-green-800 disabled:opacity-50"
           >
             Проголосовать
           </button>
@@ -172,13 +186,20 @@ export default function PostCard({ post, onVote, onSupportInitiative, onLike, on
             {post.initiative?.goal || "Предложение по улучшению нашего двора и подъездов."}
           </p>
 
+          <div className="grid grid-cols-4 gap-1" aria-label="Этапы инициативы">
+            {["Предложено", "Обсуждение", "Решение", "Реализация"].map((label, index) => {
+              const current = post.initiative?.stage === "proposal" ? 0 : post.initiative?.stage === "discussion" ? 1 : ["voting", "hoa_review", "approved", "fundraising"].includes(post.initiative?.stage || "") ? 2 : 3;
+              return <div key={label} className="min-w-0"><div className={`h-1.5 rounded-full transition-colors duration-500 ${index <= current ? "bg-green-700" : "bg-emerald-100"}`} /><p className={`mt-1 truncate text-[9px] font-bold ${index <= current ? "text-green-800" : "text-stone-600"}`}>{label}</p></div>;
+            })}
+          </div>
+
           <div className="flex items-center justify-between pt-1">
-            <span className="text-xs text-gray-500 font-medium">
+            <span className="text-xs font-medium text-gray-600">
               Поддержали: <strong className="text-gray-900">{post.initiative?.supporters || 0} соседей</strong>
             </span>
             <button
               onClick={() => post.initiative && onSupportInitiative && onSupportInitiative(post.initiative.id)}
-              className="px-3.5 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 active:scale-95 transition"
+              className="rounded-lg bg-green-700 px-3.5 py-1.5 text-xs font-medium text-white transition hover:bg-green-800 active:scale-95"
             >
               Поддержать
             </button>
@@ -205,7 +226,7 @@ export default function PostCard({ post, onVote, onSupportInitiative, onLike, on
 
                 <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden">
                   <div
-                    className="bg-green-600 h-full rounded-full transition-all"
+                    className="h-full rounded-full bg-green-700 transition-all"
                     style={{
                       width: `${Math.min(100, progress)}%`,
                     }}
@@ -216,7 +237,7 @@ export default function PostCard({ post, onVote, onSupportInitiative, onLike, on
                   <span className="text-base font-bold text-gray-900">
                     {post.fundraiser.current_amount.toLocaleString("ru-RU")} ₸
                   </span>
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-gray-600">
                     из {post.fundraiser.target_amount.toLocaleString("ru-RU")} ₸
                   </span>
                 </div>
@@ -226,7 +247,7 @@ export default function PostCard({ post, onVote, onSupportInitiative, onLike, on
 
           <Link
             href={`/hoa/fundraisers/${post.fundraiser.id}`}
-            className="w-full mt-1 py-2.5 bg-green-600 text-white font-medium text-xs rounded-xl flex items-center justify-center gap-1.5 hover:bg-green-700 transition"
+            className="mt-1 flex w-full items-center justify-center gap-1.5 rounded-xl bg-green-700 py-2.5 text-xs font-medium text-white transition hover:bg-green-800"
           >
             Внести свой вклад <ArrowRight className="w-3.5 h-3.5" />
           </Link>
@@ -234,7 +255,7 @@ export default function PostCard({ post, onVote, onSupportInitiative, onLike, on
       )}
 
       {/* Нижняя панель действий (Лайки, комментарии, поделиться) */}
-      <div className="flex items-center justify-between pt-2 text-gray-500 text-xs border-t border-gray-50">
+      <div className="flex items-center justify-between border-t border-gray-50 pt-2 text-xs text-gray-600">
         <div className="flex items-center gap-4">
           <button
             onClick={() => {
@@ -255,8 +276,9 @@ export default function PostCard({ post, onVote, onSupportInitiative, onLike, on
           </Link>
         </div>
 
-        <button className="flex items-center gap-1 hover:text-gray-700 transition" aria-label="Поделиться">
-          <Share2 className="w-4 h-4" />
+        <button onClick={sharePost} className="flex min-h-10 items-center gap-1.5 rounded-xl px-2 transition hover:bg-stone-100 hover:text-stone-800" aria-label="Поделиться публикацией">
+          {shareState === "done" ? <CheckCircle2 className="h-4 w-4 text-green-700" /> : <Share2 className="h-4 w-4" />}
+          <span>{shareState === "done" ? "Ссылка скопирована" : "Поделиться"}</span>
         </button>
       </div>
     </article>

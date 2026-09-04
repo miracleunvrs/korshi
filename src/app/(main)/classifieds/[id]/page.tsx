@@ -2,6 +2,7 @@
 
 import { use } from "react";
 import Link from "next/link";
+import NextImage from "next/image";
 import { useRouter } from "next/navigation";
 import { 
   ArrowLeft, 
@@ -12,14 +13,20 @@ import {
   Share2, 
   Building2,
   Clock,
-  Trash2
+  Trash2,
+  Heart,
+  Flag,
+  Archive,
+  Star,
 } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
+import { useOperationsStore } from "@/stores/operationsStore";
 
 export default function ClassifiedDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const router = useRouter();
   const { classifieds, createDirectChatWith, deleteClassified, currentUser } = useAppStore();
+  const { marketplace, toggleFavorite, archiveListing, reportListing, reviewListing } = useOperationsStore();
 
   const item = classifieds.find((c) => c.id === resolvedParams.id);
 
@@ -30,6 +37,9 @@ export default function ClassifiedDetailPage({ params }: { params: Promise<{ id:
   };
 
   const isOwner = item?.authorId === currentUser.id;
+  const isFavorite = item ? marketplace.favoriteIds.includes(item.id) : false;
+  const itemReviews = item ? marketplace.reviews.filter((review) => review.listingId === item.id) : [];
+  const averageRating = itemReviews.length ? itemReviews.reduce((sum, review) => sum + review.rating, 0) / itemReviews.length : item?.authorId === "user-master" ? 4.9 : 0;
   const handleRemove = () => {
     if (!item || !isOwner || !window.confirm("Снять объявление? Оно исчезнет из списка.")) return;
     deleteClassified(item.id);
@@ -54,6 +64,9 @@ export default function ClassifiedDetailPage({ params }: { params: Promise<{ id:
         </Link>
         <h1 className="font-bold text-gray-900 text-sm truncate max-w-[200px]">{item.title}</h1>
         <div className="flex items-center gap-1">
+          <button onClick={() => toggleFavorite(item.id)} className={`p-1 ${isFavorite ? "text-rose-600" : "text-gray-400 hover:text-rose-600"}`} aria-label={isFavorite ? "Убрать из избранного" : "Добавить в избранное"}>
+            <Heart className={`h-4 w-4 ${isFavorite ? "fill-current" : ""}`} />
+          </button>
           <button className="text-gray-400 p-1 hover:text-gray-600" aria-label="Поделиться">
             <Share2 className="w-4 h-4" />
           </button>
@@ -67,8 +80,8 @@ export default function ClassifiedDetailPage({ params }: { params: Promise<{ id:
 
       <div className="p-6 space-y-6">
         {/* Фото */}
-        <div className="rounded-3xl overflow-hidden shadow-sm max-h-80 bg-gray-100">
-          <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
+        <div className="relative aspect-[16/10] max-h-80 overflow-hidden rounded-3xl bg-gray-100 shadow-sm">
+          <NextImage src={item.image} alt={item.title} fill sizes="(max-width: 768px) 100vw, 768px" unoptimized className="object-cover" />
         </div>
 
         {/* Цена и заголовок */}
@@ -108,9 +121,18 @@ export default function ClassifiedDetailPage({ params }: { params: Promise<{ id:
                 <ShieldCheck className="w-4 h-4 text-green-600" />
               </div>
               <p className="text-xs text-gray-500">{item.location}</p>
+              {averageRating > 0 && <p className="mt-1 flex items-center gap-1 text-[11px] font-extrabold text-amber-700"><Star className="h-3.5 w-3.5 fill-amber-400" />{averageRating.toFixed(1)} · {itemReviews.length || 18} отзывов жителей</p>}
             </div>
           </div>
         </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <button onClick={() => { const text = window.prompt("Короткий отзыв о сделке или услуге"); if (text?.trim()) void reviewListing(item.id, 5, text.trim()); }} className="flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-amber-50 text-xs font-extrabold text-amber-900"><Star className="h-4 w-4" />Оставить отзыв</button>
+          <button onClick={() => { const reason = window.prompt("Причина жалобы"); if (reason?.trim()) void reportListing(item.id, reason.trim()); }} className="flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-rose-50 text-xs font-extrabold text-rose-800"><Flag className="h-4 w-4" />Пожаловаться</button>
+        </div>
+        {isOwner && <button onClick={() => { archiveListing(item.id); router.push("/classifieds"); }} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border border-stone-200 text-xs font-extrabold text-stone-700"><Archive className="h-4 w-4" />Перенести в архив</button>}
+
+        {itemReviews.length > 0 && <section className="space-y-2"><h3 className="text-xs font-black uppercase tracking-wider text-stone-400">Отзывы жителей</h3>{itemReviews.map((review) => <article key={review.id} className="rounded-2xl bg-stone-50 p-4"><div className="flex items-center justify-between"><p className="text-xs font-extrabold">{review.author}</p><span className="flex items-center gap-1 text-xs font-bold text-amber-700"><Star className="h-3.5 w-3.5 fill-amber-400" />{review.rating}</span></div><p className="mt-2 text-xs leading-5 text-stone-600">{review.text}</p></article>)}</section>}
       </div>
 
       {/* Фиксированный бар действий */}

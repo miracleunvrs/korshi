@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import NextImage from "next/image";
 import { 
   ShieldCheck, 
   Users, 
@@ -14,9 +15,21 @@ import {
   Search,
   Bell,
   Sparkles,
-  ChevronRight
+  ChevronRight,
+  ClipboardList,
+  Clock3,
+  Star,
+  TrendingUp,
+  Vote,
+  WalletCards,
+  Send,
+  Download,
+  Settings2,
+  Shield,
 } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
+import { useOperationsStore } from "@/stores/operationsStore";
+import { syncPlatformMutation } from "@/lib/supabase/platformRepository";
 
 export default function AdminPage() {
   const { 
@@ -26,10 +39,19 @@ export default function AdminPage() {
     urgentAlert, 
     setUrgentAlert,
     currentUser,
+    serviceRequests,
+    officialVotes,
+    documents,
+    finance,
+    registeredUsers,
   } = useAppStore();
 
-  const [activeTab, setActiveTab] = useState<"requests" | "residents" | "alert" | "stats">("requests");
+  const [activeTab, setActiveTab] = useState<"requests" | "residents" | "alert" | "stats">("stats");
   const [selectedDocImage, setSelectedDocImage] = useState<string | null>(null);
+  const [broadcastStatus, setBroadcastStatus] = useState("");
+  const marketplace = useOperationsStore((state) => state.marketplace);
+  const accessEvents = useOperationsStore((state) => state.accessEvents);
+  const works = useOperationsStore((state) => state.works);
 
   // Urgent alert form
   const [alertTitle, setAlertTitle] = useState(urgentAlert?.title || "");
@@ -53,7 +75,9 @@ export default function AdminPage() {
       id: `alert-${Date.now()}`,
       title: alertTitle.trim(),
       message: alertMessage.trim(),
+      affectedAreas: [],
       active: true,
+      acknowledged: false,
       createdAt: "Только что",
     });
   };
@@ -65,6 +89,24 @@ export default function AdminPage() {
   };
 
   const pendingRequests = verificationRequests.filter((r) => r.status === "pending");
+  const activeServiceRequests = serviceRequests.filter((request) => request.status === "submitted" || request.status === "in_progress");
+  const ratedRequests = serviceRequests.filter((request) => request.rating);
+  const averageRating = ratedRequests.length
+    ? ratedRequests.reduce((sum, request) => sum + (request.rating || 0), 0) / ratedRequests.length
+    : 0;
+  const overdueRequests = activeServiceRequests.filter((request) => request.priority === "emergency" || request.events.some((event) => event.kind === "reopened"));
+
+  const sendBroadcast = async () => {
+    const text = window.prompt("Текст массового уведомления для жителей ЖК");
+    if (!text?.trim()) return;
+    const result = await syncPlatformMutation({ operation: "insert", table: "notification_broadcasts", payload: { title: "Сообщение ОСИ", body: text.trim(), channels: ["in_app", "push"] } });
+    setBroadcastStatus(result.queued ? "Рассылка сохранена в очереди синхронизации" : "Рассылка поставлена в очередь доставки");
+  };
+
+  const exportAdminReport = () => {
+    const rows = [["Показатель", "Значение"], ["Открытые заявки", String(activeServiceRequests.length)], ["Просроченные", String(overdueRequests.length)], ["Средняя оценка", averageRating.toFixed(1)], ["Жители", String(registeredUsers.length)], ["Жалобы маркетплейса", String(marketplace.reports.length)], ["События доступа", String(accessEvents.length)]];
+    const blob = new Blob(["\uFEFF" + rows.map((row) => row.join(";")).join("\n")], { type: "text/csv;charset=utf-8" }); const url = URL.createObjectURL(blob); const anchor = document.createElement("a"); anchor.href = url; anchor.download = "korshi-admin-report.csv"; anchor.click(); URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="min-h-screen bg-white pb-12">
@@ -89,6 +131,7 @@ export default function AdminPage() {
         {/* Вкладки админки */}
         <div className="flex gap-2 border-b border-gray-100 pb-1">
           {[
+            { id: "stats", label: "Обзор" },
             { id: "requests", label: "Заявки на верификацию", badge: pendingRequests.length },
             { id: "residents", label: "Реестр жильцов" },
             { id: "alert", label: "Экстренное оповещение" },
@@ -118,6 +161,38 @@ export default function AdminPage() {
 
       {/* Контент активной вкладки */}
       <div className="p-6">
+        {activeTab === "stats" && (
+          <div className="space-y-6">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {[
+                { label: "Активные заявки", value: activeServiceRequests.length, detail: `${serviceRequests.filter((request) => request.status === "submitted").length} новых`, icon: ClipboardList, tone: "bg-green-100 text-green-800" },
+                { label: "Оценка сервиса", value: averageRating ? averageRating.toFixed(1) : "—", detail: `${ratedRequests.length} оценок`, icon: Star, tone: "bg-amber-100 text-amber-900" },
+                { label: "Активные голосования", value: officialVotes.filter((vote) => vote.status === "active").length, detail: "контроль кворума", icon: Vote, tone: "bg-violet-100 text-violet-800" },
+                { label: "Баланс ОСИ", value: `${Math.round(finance.balance / 1000).toLocaleString("ru-RU")} тыс. ₸`, detail: "по журналу операций", icon: WalletCards, tone: "bg-sky-100 text-sky-800" },
+              ].map((item) => <div key={item.label} className="rounded-[22px] border border-stone-200 bg-white p-4 shadow-sm"><span className={`grid h-10 w-10 place-items-center rounded-xl ${item.tone}`}><item.icon className="h-5 w-5" /></span><p className="mt-4 text-2xl font-black tracking-tight text-stone-950">{item.value}</p><p className="mt-1 text-xs font-extrabold text-stone-700">{item.label}</p><p className="text-[11px] text-stone-400">{item.detail}</p></div>)}
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[
+              ["Среднее время ответа", "42 мин", "за 30 дней"],
+              ["Просроченные заявки", String(overdueRequests.length), "SLA и повторно открытые"],
+              ["Активность жителей", `${Math.min(100, Math.round(registeredUsers.filter((user) => user.verified).length / Math.max(1, registeredUsers.length) * 100))}%`, "подтверждённые аккаунты"],
+              ["Пропущенные работы", String(works.filter((work) => work.status === "missed").length), "требуют переноса"],
+            ].map(([label, value, detail]) => <article key={label} className="rounded-[22px] border border-stone-200 bg-stone-50 p-4"><p className="text-xl font-black text-stone-950">{value}</p><p className="mt-1 text-xs font-extrabold text-stone-800">{label}</p><p className="mt-1 text-[10px] text-stone-500">{detail}</p></article>)}</div>
+
+            <div className="grid gap-4 xl:grid-cols-2">
+              <section className="rounded-[24px] border border-stone-200 bg-white p-5"><div className="flex items-center justify-between"><div><h2 className="text-sm font-extrabold text-stone-950">Очередь обслуживания</h2><p className="text-xs text-stone-500">Заявки, требующие внимания</p></div><Link href="/requests" className="text-xs font-extrabold text-green-800">Открыть все</Link></div><div className="mt-4 space-y-2">{activeServiceRequests.slice(0, 4).map((request) => <Link key={request.id} href="/requests" className="flex min-h-16 items-center gap-3 rounded-2xl bg-stone-50 p-3 transition hover:bg-stone-100"><span className={`h-2.5 w-2.5 shrink-0 rounded-full ${request.priority === "emergency" ? "bg-rose-500" : request.status === "submitted" ? "bg-sky-500" : "bg-amber-500"}`} /><span className="min-w-0 flex-1"><span className="block truncate text-xs font-extrabold text-stone-900">{request.title}</span><span className="block truncate text-[11px] text-stone-500">{request.location}</span></span>{request.slaDueAt && <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800"><Clock3 className="h-3 w-3" />{request.slaDueAt}</span>}</Link>)}</div></section>
+
+              <section className="rounded-[24px] border border-stone-200 bg-white p-5"><div className="flex items-center justify-between"><div><h2 className="text-sm font-extrabold text-stone-950">Состояние дома</h2><p className="text-xs text-stone-500">Контент и участие жителей</p></div><TrendingUp className="h-5 w-5 text-green-700" /></div><dl className="mt-4 divide-y divide-stone-100">{[
+                ["Подтверждённые жители", registeredUsers.filter((user) => user.verified).length],
+                ["Документы в архиве", documents.filter((document) => document.status === "active").length],
+                ["Требуют ознакомления", documents.filter((document) => document.requiresAcknowledgement && !document.acknowledged).length],
+                ["Завершённые заявки", serviceRequests.filter((request) => request.status === "resolved" || request.status === "closed").length],
+              ].map(([label, value]) => <div key={label} className="flex min-h-12 items-center justify-between text-xs"><dt className="font-semibold text-stone-600">{label}</dt><dd className="font-black text-stone-950">{value}</dd></div>)}</dl><div className="mt-4 grid grid-cols-3 gap-2"><Link href="/documents" className="rounded-xl bg-violet-50 px-2 py-3 text-center text-[10px] font-extrabold text-violet-800">Документы</Link><Link href="/votes" className="rounded-xl bg-amber-50 px-2 py-3 text-center text-[10px] font-extrabold text-amber-900">Голосования</Link><Link href="/finance" className="rounded-xl bg-green-50 px-2 py-3 text-center text-[10px] font-extrabold text-green-800">Финансы</Link></div></section>
+            </div>
+            <section className="rounded-[24px] border border-stone-200 bg-white p-5"><div className="flex items-center justify-between gap-3"><div><h2 className="text-sm font-extrabold text-stone-950">Операции управления</h2><p className="text-xs text-stone-500">Коммуникации, отчёты и контроль</p></div><Settings2 className="h-5 w-5 text-stone-500" /></div><div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4"><button onClick={() => void sendBroadcast()} className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl bg-green-800 px-2 text-[10px] font-extrabold text-white"><Send className="h-4 w-4" />Рассылка</button><button onClick={exportAdminReport} className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl bg-violet-50 px-2 text-[10px] font-extrabold text-violet-800"><Download className="h-4 w-4" />Экспорт</button><Link href="/operations" className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl bg-amber-50 px-2 text-[10px] font-extrabold text-amber-900"><Shield className="h-4 w-4" />Безопасность</Link><Link href="/admin/settings" className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl bg-stone-100 px-2 text-[10px] font-extrabold text-stone-800"><Settings2 className="h-4 w-4" />Настройки ЖК</Link></div>{broadcastStatus && <p role="status" className="mt-3 rounded-xl bg-emerald-50 p-3 text-xs font-bold text-emerald-900">{broadcastStatus}</p>}<div className="mt-4 grid gap-2 sm:grid-cols-3"><p className="rounded-xl bg-stone-50 p-3 text-[10px] font-bold text-stone-600">Модерация: {marketplace.reports.filter((report) => report.status === "new").length} новых жалоб</p><p className="rounded-xl bg-stone-50 p-3 text-[10px] font-bold text-stone-600">Журнал безопасности: {accessEvents.length} событий</p><p className="rounded-xl bg-stone-50 p-3 text-[10px] font-bold text-stone-600">Ознакомление: {documents.filter((document) => document.acknowledged).length}/{documents.filter((document) => document.requiresAcknowledgement).length || documents.length}</p></div></section>
+          </div>
+        )}
+
         {/* Вкладка 1: Очередь верификации */}
         {activeTab === "requests" && (
           <div className="space-y-4">
@@ -151,10 +226,13 @@ export default function AdminPage() {
                         onClick={() => setSelectedDocImage(req.documentUrl)}
                         className="w-16 h-16 rounded-2xl bg-gray-100 overflow-hidden ring-1 ring-black/5 cursor-pointer relative group shrink-0"
                       >
-                        <img
+                        <NextImage
                           src={req.documentUrl}
                           alt="Документ"
-                          className="w-full h-full object-cover group-hover:scale-105 transition"
+                          fill
+                          sizes="64px"
+                          unoptimized
+                          className="object-cover group-hover:scale-105 transition"
                         />
                         <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition">
                           <Eye className="w-4 h-4" />
@@ -321,7 +399,7 @@ export default function AdminPage() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <img src={selectedDocImage} alt="Документ" className="w-full max-h-[70vh] object-contain rounded-2xl" />
+            <NextImage src={selectedDocImage} alt="Документ" width={1200} height={900} unoptimized className="h-auto w-full max-h-[70vh] object-contain rounded-2xl" />
           </div>
         </div>
       )}

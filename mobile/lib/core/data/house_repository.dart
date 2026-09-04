@@ -5,9 +5,11 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../supabase/supabase_config.dart';
 import '../../features/feed/models/post.dart';
 import 'media_limits.dart';
+import 'offline_action_queue.dart';
 
 class HouseRepository {
   SupabaseClient get _client => SupabaseConfig.client;
+  final OfflineActionQueue _offlineQueue = OfflineActionQueue();
 
   bool get isConfigured => !SupabaseConfig.isPlaceholder;
 
@@ -103,6 +105,61 @@ class HouseRepository {
     return posts;
   }
 
+  Future<void> createPost({
+    required String type,
+    required String title,
+    required String content,
+    required String territory,
+    List<String> pollOptions = const [],
+    String? initiativeGoal,
+  }) async {
+    final user = _client.auth.currentUser;
+    if (user == null) throw Exception('Требуется авторизация');
+    final profile = await loadProfile();
+    final complexId = profile?['complex_id'];
+    if (complexId == null) throw Exception('Профиль ещё не привязан к ЖК');
+    if (profile?['verified'] != true) {
+      throw Exception('Публикации доступны только подтверждённым жителям');
+    }
+
+    final post = await _client
+        .from('posts')
+        .insert({
+          'author_id': user.id,
+          'complex_id': complexId,
+          'type': type,
+          'title': title.trim().isEmpty ? null : title.trim(),
+          'content': content.trim(),
+          'territory': territory,
+          'is_official': false,
+        })
+        .select('id')
+        .single();
+    final postId = '${post['id']}';
+
+    if (type == 'poll') {
+      final validOptions = pollOptions.map((item) => item.trim()).where((item) => item.isNotEmpty).toList();
+      if (validOptions.length < 2) throw Exception('Добавьте минимум два варианта ответа');
+      final poll = await _client
+          .from('polls')
+          .insert({'post_id': postId, 'is_multiple': false})
+          .select('id')
+          .single();
+      await _client.from('poll_options').insert([
+        for (var index = 0; index < validOptions.length; index++)
+          {'poll_id': poll['id'], 'text': validOptions[index], 'position': index},
+      ]);
+    }
+
+    if (type == 'initiative') {
+      await _client.from('initiatives').insert({
+        'post_id': postId,
+        'stage': 'proposal',
+        'goal': initiativeGoal?.trim().isNotEmpty == true ? initiativeGoal!.trim() : content.trim(),
+      });
+    }
+  }
+
   Future<List<Map<String, dynamic>>> loadChats() async {
     final rows = await _client
         .from('chats')
@@ -163,12 +220,12 @@ class HouseRepository {
   Future<void> sendMessage(String chatId, String content) async {
     final user = _client.auth.currentUser;
     if (user == null) throw Exception('Требуется авторизация');
-    await _client.from('messages').insert({
-      'chat_id': chatId,
-      'sender_id': user.id,
-      'content': content,
-      'type': 'text',
-    });
+    final payload = {'chat_id': chatId, 'sender_id': user.id, 'content': content, 'type': 'text'};
+    try {
+      await _client.from('messages').insert(payload);
+    } catch (_) {
+      await _offlineQueue.add('message', payload);
+    }
   }
 
   Future<void> sendAttachment({
@@ -193,13 +250,24 @@ class HouseRepository {
     final safeName = fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
     final path =
         '${user.id}/chats/$chatId/${DateTime.now().millisecondsSinceEpoch}_$safeName';
-    await _client.storage
-        .from('house-media')
-        .uploadBinary(
-          path,
-          Uint8List.fromList(bytes),
-          fileOptions: FileOptions(contentType: normalizedMimeType, upsert: false),
-        );
+    for (var attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        await _client.storage
+            .from('house-media')
+            .uploadBinary(
+              path,
+              Uint8List.fromList(bytes),
+              fileOptions: FileOptions(
+                contentType: normalizedMimeType,
+                upsert: false,
+              ),
+            );
+        break;
+      } catch (_) {
+        if (attempt == 2) rethrow;
+        await Future<void>.delayed(Duration(milliseconds: 300 * (1 << attempt)));
+      }
+    }
     await _client.from('messages').insert({
       'chat_id': chatId,
       'sender_id': user.id,
@@ -220,6 +288,47 @@ class HouseRepository {
     return rows.map((row) => Map<String, dynamic>.from(row)).toList();
   }
 
+  Future<List<Map<String, dynamic>>> loadServiceRequests() async {
+    if (!isConfigured) return const [];
+    final rows = await _client
+        .from('service_requests')
+        .select('*')
+        .order('created_at', ascending: false)
+        .limit(100);
+    return rows.map((row) => Map<String, dynamic>.from(row)).toList();
+  }
+
+  Future<void> createServiceRequest({
+    required String category,
+    required String title,
+    required String description,
+    required String location,
+    required String priority,
+  }) async {
+    final user = _client.auth.currentUser;
+    if (user == null) throw Exception('Требуется авторизация');
+    final profile = await loadProfile();
+    final complexId = profile?['complex_id'];
+    if (complexId == null) throw Exception('Профиль ещё не привязан к ЖК');
+    if (profile?['verified'] != true) {
+      throw Exception('Заявки доступны только подтверждённым жителям');
+    }
+    final payload = {
+      'created_by': user.id,
+      'complex_id': complexId,
+      'category': category,
+      'title': title.trim(),
+      'description': description.trim(),
+      'location': location.trim(),
+      'priority': priority,
+    };
+    try {
+      await _client.from('service_requests').insert(payload);
+    } catch (_) {
+      await _offlineQueue.add('service_request', payload);
+    }
+  }
+
   Future<void> markNotificationRead(String notificationId) async {
     await _client
         .from('notifications')
@@ -237,7 +346,7 @@ class HouseRepository {
     final profile = await loadProfile();
     final complexId = profile?['complex_id'];
     if (complexId == null) throw Exception('Профиль ещё не привязан к ЖК');
-    await _client.from('classifieds').insert({
+    final payload = {
       'author_id': user.id,
       'complex_id': complexId,
       'title': title.trim(),
@@ -247,6 +356,21 @@ class HouseRepository {
           ? null
           : num.tryParse(price.trim()),
       'currency': 'KZT',
-    });
+    };
+    try {
+      await _client.from('classifieds').insert(payload);
+    } catch (_) {
+      await _offlineQueue.add('classified', payload);
+    }
   }
+
+  Future<int> flushOfflineActions() => _offlineQueue.flush((action) async {
+        final table = switch (action.type) {
+          'message' => 'messages',
+          'service_request' => 'service_requests',
+          'classified' => 'classifieds',
+          _ => throw Exception('Неизвестное offline-действие'),
+        };
+        await _client.from(table).insert(action.payload);
+      });
 }
